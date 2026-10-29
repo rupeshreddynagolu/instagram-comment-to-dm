@@ -4,11 +4,11 @@ CampaignCue is designed as an open-core product with a hosted SaaS path. This ch
 
 ## Runtime Health
 
-- Web/API runs on Vercel.
-- The persistent DM worker runs separately with `npm run worker`.
-- `/api/health` checks database connectivity, Redis connectivity, BullMQ queue counts, and worker heartbeat age.
-- The worker writes a Redis heartbeat every 30 seconds with a 120 second TTL.
-- Worker failures are recorded in Redis alerts and `OperationalEvent` rows.
+- Web/API runs on Vercel with `RUN_JOBS=false`.
+- The persistent DM worker runs separately with `npm run worker`. On a long-running Node host, the web app runs it in-process instead.
+- `/api/health` checks database connectivity, Sidequest queue counts, and worker heartbeat age.
+- The worker writes a `WorkerHeartbeat` row every 30 seconds; it counts as healthy for 120 seconds.
+- Worker failures are recorded in `WorkerAlert` rows (newest 25 kept) and `OperationalEvent` rows.
 - Authenticated operators can view diagnostics at `/diagnostics`.
 
 ## Diagnostics
@@ -27,7 +27,7 @@ The diagnostics surface includes:
 
 - Monthly DM usage is reserved in a database transaction with a conditional `updateMany`.
 - If a Meta private reply send fails, the monthly reservation is released for the same usage period.
-- Hourly Instagram DM limits are reserved through one Redis Lua script so concurrent workers cannot all pass the rate limit before incrementing.
+- Hourly Instagram DM limits are reserved under a `SELECT ... FOR UPDATE` row lock on `RateLimitCounter`, so concurrent workers cannot all pass the rate limit before incrementing.
 - Rate-limit requeues release monthly reservations before scheduling a delayed retry.
 
 ## Legal And Meta Review Pages
@@ -65,13 +65,13 @@ Dev/build tooling advisories should still be tracked before public contributor c
 ## Staging Smoke Checklist
 
 1. Deploy web/API to Vercel with production-like environment variables.
-2. Deploy worker to Railway with the same `DATABASE_URL`, `REDIS_URL`, and secrets.
-3. Run `npm run db:migrate` against staging Postgres.
+2. Deploy worker to Railway with the same `DATABASE_URL` and secrets.
+3. Run `npm run db:migrate` against staging MySQL.
 4. Confirm `/api/health` returns `status: ok` after the worker starts.
 5. Sign in by magic link and confirm a workspace is created.
 6. Connect a Meta test Instagram professional account.
 7. Create one keyword campaign for a test post or reel.
-8. Send a signed Meta webhook test payload and confirm one BullMQ job is queued.
+8. Send a signed Meta webhook test payload and confirm one `sidequest_jobs` row is queued.
 9. Comment the keyword from a test user and confirm one private reply is sent.
 10. Confirm `/logs` shows one `SENT` log and `/diagnostics` has no new failures.
 11. Trigger Stripe test checkout and confirm the plan changes only after the Stripe webhook.

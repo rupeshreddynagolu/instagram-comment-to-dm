@@ -25,7 +25,7 @@ The hosted product can charge for:
 
 - Managed Vercel/Railway infrastructure.
 - Production monitoring.
-- Hosted Postgres and Redis.
+- Hosted MySQL.
 - Public campaign templates.
 - Tracked links.
 - Campaign analytics.

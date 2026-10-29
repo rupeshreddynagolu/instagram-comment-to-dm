@@ -28,8 +28,7 @@ What happened instead?
 
 - OS:
 - Node version:
-- Database:
-- Redis:
+- Database (MySQL/MariaDB version):
 - Browser:
 
 ## Logs Or Screenshots

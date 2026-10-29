@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
 }
 
 model User {
@@ -31,12 +31,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -137,7 +137,7 @@ model InstagramAccount {
   instagramId       String   @unique
   username          String
   name              String?
-  accessToken       String
+  accessToken       String   @db.Text
   tokenExpiresAt    DateTime?
   webhookSubscribed Boolean  @default(false)
   connectedAt       DateTime @default(now())
@@ -159,9 +159,9 @@ model Automation {
   name           String
   goal           String?
   postId         String
-  postUrl        String?
-  keywords       String[]
-  dmMessage      String
+  postUrl        String? @db.Text
+  keywords       Json
+  dmMessage      String @db.Text
   isActive       Boolean @default(true)
   wholeWordMatch Boolean @default(true)
   reportShareSlug    String? @unique
@@ -189,13 +189,13 @@ model DmLog {
 
   commenterId   String
   commenterName String?
-  commentText   String
+  commentText   String @db.Text
   commentId     String
   matchedKeyword String?
   status        DmStatus @default(PENDING)
   attempts      Int      @default(0)
   dmSentAt      DateTime?
-  errorMessage  String?
+  errorMessage  String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -217,7 +217,7 @@ model TrackedLink {
   automationId   String
   slug           String   @unique
   label          String?
-  destinationUrl String
+  destinationUrl String @db.Text
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -236,8 +236,8 @@ model LinkClick {
   instagramAccountId String
   trackedLinkId      String
   ipHash             String?
-  userAgent          String?
-  referrer           String?
+  userAgent          String? @db.Text
+  referrer           String? @db.Text
   createdAt          DateTime @default(now())
 
   workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -259,7 +259,7 @@ model WebhookEvent {
   object      String?
   payload     Json
   status      WebhookStatus @default(PENDING)
-  errorMessage String?
+  errorMessage String? @db.Text
   createdAt   DateTime      @default(now())
   processedAt DateTime?
 
@@ -287,7 +287,7 @@ model OperationalEvent {
   workspaceId String?
   source      OperationalEventSource
   level       OperationalEventLevel @default(INFO)
-  message     String
+  message     String @db.Text
   payload     Json?
   createdAt   DateTime              @default(now())
   resolvedAt  DateTime?
@@ -297,6 +297,32 @@ model OperationalEvent {
   @@index([workspaceId])
   @@index([source])
   @@index([level])
+  @@index([createdAt])
+}
+
+// Fixed-window counter behind the hourly private-reply cap
+// (lib/utils/rate-limiter.ts). One row per key; a row past expiresAt is reset
+// on the next reservation rather than deleted.
+model RateLimitCounter {
+  key       String   @id
+  count     Int
+  expiresAt DateTime @db.DateTime(3)
+}
+
+// Liveness of the job runtime, written every 30s (lib/ops/worker-health.ts).
+// One row per worker kind; "dm" is the only one today.
+model WorkerHeartbeat {
+  id        String   @id
+  payload   Json
+  checkedAt DateTime @db.DateTime(3)
+}
+
+// Recent job failures shown in diagnostics. Trimmed to the newest 25 on write.
+model WorkerAlert {
+  id        String   @id @default(cuid())
+  payload   Json
+  createdAt DateTime @default(now()) @db.DateTime(3)
+
   @@index([createdAt])
 }
 

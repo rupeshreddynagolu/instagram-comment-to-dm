@@ -1,18 +1,20 @@
 # CampaignCue Production Deployment
 
-This app is designed as two deployable services:
+The web app and the DM job runtime can run as one Node process: on `next start`, `instrumentation.ts` starts the Sidequest engine in-process. Jobs, the hourly rate limiter, and the worker heartbeat all live in MySQL (or MariaDB), so no Redis is needed.
 
-- **Web/API**: Next.js on Vercel.
+On a serverless host like Vercel the runtime cannot stay up, so run it as two services:
+
+- **Web/API**: Next.js on Vercel, with `RUN_JOBS=false`.
 - **Worker**: a persistent Railway service running `npm run worker`.
 
-Postgres and Redis should be provisioned on Railway or another managed provider and shared by both services.
+Provision MySQL on Railway or another managed provider and share it between both services.
 
 ## Required Environment Variables
 
 Copy `.env.example` and set every value in Vercel and Railway:
 
-- `DATABASE_URL`
-- `REDIS_URL`
+- `DATABASE_URL` (a `mysql://` connection string)
+- `RUN_JOBS` (set to `false` on the web app when the worker runs separately)
 - `NEXTAUTH_URL`
 - `NEXTAUTH_SECRET`
 - `CRON_SECRET`
@@ -37,7 +39,7 @@ openssl rand -hex 32
 
 ## Database
 
-Run migrations before starting production traffic:
+Run migrations before starting production traffic. Sidequest creates and migrates its own `sidequest_*` tables on first start.
 
 ```bash
 npm ci
@@ -48,7 +50,7 @@ npm run db:migrate
 ## Vercel Web/API
 
 1. Create a Vercel project from this repository.
-2. Add all environment variables.
+2. Add all environment variables, including `RUN_JOBS=false`.
 3. Set the production domain as `NEXTAUTH_URL`.
 4. Deploy.
 5. Vercel Cron will call `/api/cron/refresh-tokens` daily using `vercel.json`.
@@ -63,7 +65,7 @@ Start command:
 npm run worker
 ```
 
-Use the same `DATABASE_URL`, `REDIS_URL`, Meta, Stripe, and encryption environment variables as the Vercel app.
+Use the same `DATABASE_URL`, Meta, Stripe, and encryption environment variables as the Vercel app. `ENCRYPTION_KEY` must match: the web app encrypts Instagram tokens and the worker decrypts them.
 
 ## Stripe
 

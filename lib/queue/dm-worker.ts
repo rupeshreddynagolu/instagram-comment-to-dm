@@ -1,9 +1,9 @@
-import { Worker, type Job } from "bullmq";
-import { getDMQueue, getRedisConnection, type ProcessCommentJob } from "./client";
+import { getDMQueue, type ProcessCommentJob } from "./client";
 import { prisma } from "@/lib/db/client";
 import { MetaApiError, sendPrivateReply } from "@/lib/meta/client";
 import { decryptToken } from "@/lib/meta/oauth";
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
+import { asStringArray } from "@/lib/utils/json-array";
 import { reserveDMSlot } from "@/lib/utils/rate-limiter";
 import {
   releaseWorkspaceDMReservation,
@@ -12,7 +12,15 @@ import {
 import { recordWorkerAlert } from "@/lib/ops/worker-health";
 import { renderMessageWithTracking } from "@/lib/tracking/message";
 
-const BACKOFF_DELAYS = [5 * 60 * 1000, 15 * 60 * 1000, 45 * 60 * 1000];
+// A queued job as the processor sees it. Mirrors the BullMQ job this was
+// written against; DmJob (lib/jobs/dm-job.ts) builds it from the Sidequest job.
+export interface Job<T = ProcessCommentJob> {
+  id: string;
+  name: string;
+  data: T;
+  // Earlier failed attempts of this job, so 0 on the first run.
+  attemptsMade: number;
+}
 
 function formatError(error: unknown): string {
   if (error instanceof MetaApiError) {
@@ -24,7 +32,7 @@ function formatError(error: unknown): string {
   return "Unknown error";
 }
 
-async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
+export async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
   const {
     instagramAccountId,
     commentId,
@@ -60,7 +68,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
   for (const automation of automations) {
     const matchResult = matchKeywords(
       commentText,
-      automation.keywords,
+      asStringArray(automation.keywords),
       automation.wholeWordMatch
     );
 
@@ -318,7 +326,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
   }
 }
 
-async function recordWorkerFailure(
+export async function recordWorkerFailure(
   job: Job<ProcessCommentJob> | undefined,
   error: Error
 ) {
@@ -359,52 +367,4 @@ async function recordWorkerFailure(
       formatError(recordError)
     );
   }
-}
-
-export function createDMWorker(): Worker<ProcessCommentJob> {
-  const worker = new Worker<ProcessCommentJob>(
-    "dm-processing",
-    processComment,
-    {
-      connection: getRedisConnection(),
-      concurrency: 5,
-      settings: {
-        backoffStrategy: (attemptsMade: number) =>
-          BACKOFF_DELAYS[Math.min(attemptsMade - 1, BACKOFF_DELAYS.length - 1)],
-      },
-    }
-  );
-
-  worker.on("completed", (job) => {
-    console.log(`[DM Worker] Job ${job.id} completed`);
-  });
-
-  worker.on("failed", (job, err) => {
-    console.error(
-      `[DM Worker] Job ${job?.id} failed (attempt ${job?.attemptsMade}):`,
-      err.message
-    );
-    void recordWorkerFailure(job, err);
-  });
-
-  worker.on("error", (err) => {
-    console.error("[DM Worker] Worker error:", err.message);
-    void prisma.operationalEvent
-      .create({
-        data: {
-          source: "WORKER",
-          level: "ERROR",
-          message: `DM worker process error: ${err.message}`,
-          payload: { name: err.name },
-        },
-      })
-      .catch((recordError) => {
-        console.error(
-          "[DM Worker] Failed to record worker process error:",
-          formatError(recordError)
-        );
-      });
-  });
-
-  return worker;
 }

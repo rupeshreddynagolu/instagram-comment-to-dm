@@ -26,9 +26,9 @@ Most tools in this market are broad chatbot platforms. CampaignCue is intentiona
 - Instagram professional account connection as an integration.
 - Keyword campaigns for posts and reels.
 - Meta webhook verification and event storage.
-- BullMQ worker for private reply delivery.
+- Sidequest job queue on MySQL for private reply delivery — no Redis.
 - Idempotent DM logs per campaign/comment.
-- Atomic monthly usage reservations and Redis-backed hourly DM reservations.
+- Atomic monthly usage reservations and MySQL-backed hourly DM reservations.
 - Stripe Checkout, Customer Portal, and subscription webhooks.
 - Plan limits for campaigns and monthly DMs.
 - Vercel cron for token refresh and usage maintenance.
@@ -38,7 +38,7 @@ Most tools in this market are broad chatbot platforms. CampaignCue is intentiona
 - Tracked redirect links with click, CTR, and keyword analytics.
 - Shareable read-only client report pages.
 - Agency-ready multi-account workspaces with member roles and invite links.
-- Production deployment docs for Vercel, Railway, Postgres, and Redis.
+- Production deployment docs for Vercel, Railway, and MySQL.
 
 ## Demo
 
@@ -82,8 +82,7 @@ The core remains public so builders can self-host, audit, fork, and contribute.
 ### Requirements
 
 - Node.js 20+
-- PostgreSQL
-- Redis
+- MySQL 8 or MariaDB (the job queue lives here too)
 - Meta Developer App
 - Instagram Business or Creator account
 - Resend account for magic-link email
@@ -112,7 +111,6 @@ cp .env.example .env
 Fill in all required values:
 
 - `DATABASE_URL`
-- `REDIS_URL`
 - `NEXTAUTH_URL`
 - `NEXTAUTH_SECRET`
 - `CRON_SECRET`
