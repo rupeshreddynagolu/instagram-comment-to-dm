@@ -52,6 +52,22 @@ describe("verifyWebhookSignature", () => {
     const signature = createSignature(payload, "wrong_secret");
     expect(verifyWebhookSignature(payload, signature)).toBe(false);
   });
+
+  it("should accept a signature made with the Instagram app secret", () => {
+    // Instagram-Login apps sign webhooks with the Instagram app secret.
+    vi.stubEnv("INSTAGRAM_APP_SECRET", "test_instagram_secret_67890");
+    const payload = '{"test": "data"}';
+    const signature = createSignature(payload, "test_instagram_secret_67890");
+    expect(verifyWebhookSignature(payload, signature)).toBe(true);
+  });
+
+  it("should work with only the Instagram app secret set", () => {
+    vi.stubEnv("FACEBOOK_APP_SECRET", "");
+    vi.stubEnv("INSTAGRAM_APP_SECRET", "test_instagram_secret_67890");
+    const payload = '{"test": "data"}';
+    const signature = createSignature(payload, "test_instagram_secret_67890");
+    expect(verifyWebhookSignature(payload, signature)).toBe(true);
+  });
 });
 
 describe("parseCommentEvents", () => {
