@@ -27,7 +27,7 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
         env:
-          DATABASE_URL: mysql://root:mysql@localhost:3306/campaigncue
+          DATABASE_URL: mysql://root:mysql@localhost:3306/replynxt
 
       - name: Typecheck
         run: npm run typecheck
@@ -41,7 +41,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          DATABASE_URL: mysql://root:mysql@localhost:3306/campaigncue
+          DATABASE_URL: mysql://root:mysql@localhost:3306/replynxt
           NEXTAUTH_URL: http://localhost:3000
           NEXTAUTH_SECRET: test-secret-for-ci-build
           CRON_SECRET: test-secret-for-ci-cron

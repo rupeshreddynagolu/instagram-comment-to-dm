@@ -62,4 +62,4 @@ Object.defineProperty(DmJob, "name", { value: "DmJob" });
 // Sidequest's runner resolves job classes by importing sidequest.jobs.mjs from
 // disk, which cannot reach code inside the Next bundle. Publishing the class
 // here lets that file hand back this exact class (inline runner, same process).
-(globalThis as Record<string, unknown>).__campaignCueSidequestJobs = { DmJob };
+(globalThis as Record<string, unknown>).__replynxtSidequestJobs = { DmJob };

@@ -5,7 +5,7 @@
 // globalThis when loaded; jobs run inline in that same process, so this file
 // only hands it back. Must ship next to the app on every deploy.
 
-const jobs = globalThis.__campaignCueSidequestJobs;
+const jobs = globalThis.__replynxtSidequestJobs;
 
 if (!jobs?.DmJob) {
   throw new Error(
