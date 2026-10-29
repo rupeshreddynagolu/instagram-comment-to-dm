@@ -111,6 +111,27 @@ describe("POST /api/automations", () => {
   });
 });
 
+describe("POST /api/automations link without https://", () => {
+  it("saves the link with https:// added", async () => {
+    onPlan("PRO", 0);
+
+    const res = await createCampaign(
+      jsonRequest("http://localhost/api/automations", "POST", {
+        name: "Store",
+        goal: "Product link request",
+        matchAnyPost: true,
+        keywords: ["LINK"],
+        dmMessage: "Here: {link}",
+        trackedDestinationUrl: "yourstore.com/product",
+      })
+    );
+
+    expect(res.status).toBe(201);
+    const { data } = mockPrisma.automation.create.mock.calls[0][0];
+    expect(JSON.stringify(data)).toContain('"destinationUrl":"https://yourstore.com/product"');
+  });
+});
+
 describe("POST /api/automations/import", () => {
   it("refuses an import that would go over the plan's campaign limit", async () => {
     onPlan("FREE", 0);

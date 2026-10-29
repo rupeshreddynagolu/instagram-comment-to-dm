@@ -24,8 +24,24 @@ export function safeExternalHref(url: string | null | undefined): string {
   return url && /^https?:\/\//i.test(url) ? url : "#";
 }
 
+/**
+ * People type links as "yourstore.com/page" or "www.yourstore.com". Give a
+ * link with no scheme https://, and leave one that has a scheme alone so the
+ * check below can still refuse javascript:, data: and the like.
+ */
+export function normalizeWebUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || /^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^\/\//, "")}`;
+}
+
+const WEB_URL_MESSAGE = "Enter a full web address, like https://yourstore.com/page";
+
 /** A link the tracked redirect may send people to: http(s) only. */
-export const webUrl = z
-  .string()
-  .url()
-  .refine((value) => /^https?:\/\//i.test(value), "Must be an http(s) link");
+export const webUrl = z.preprocess(
+  (value) => (typeof value === "string" ? normalizeWebUrl(value) : value),
+  z
+    .string()
+    .url(WEB_URL_MESSAGE)
+    .refine((value) => /^https?:\/\//i.test(value), WEB_URL_MESSAGE)
+);

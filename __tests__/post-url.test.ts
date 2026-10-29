@@ -6,7 +6,12 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { instagramPostUrl, safeExternalHref, webUrl } from "../lib/campaigns/post-url";
+import {
+  instagramPostUrl,
+  normalizeWebUrl,
+  safeExternalHref,
+  webUrl,
+} from "../lib/campaigns/post-url";
 
 describe("instagramPostUrl", () => {
   it("accepts Instagram post and reel permalinks", () => {
@@ -45,5 +50,20 @@ describe("webUrl", () => {
     expect(webUrl.safeParse("http://example.com").success).toBe(true);
     expect(webUrl.safeParse("javascript:alert(1)").success).toBe(false);
     expect(webUrl.safeParse("data:text/html,hi").success).toBe(false);
+  });
+});
+
+describe("links typed without https://", () => {
+  it("adds https:// to a bare domain or www link", () => {
+    expect(normalizeWebUrl("yourstore.com/product")).toBe("https://yourstore.com/product");
+    expect(normalizeWebUrl("  www.yourstore.com ")).toBe("https://www.yourstore.com");
+    expect(normalizeWebUrl("http://example.com")).toBe("http://example.com");
+    expect(normalizeWebUrl("")).toBe("");
+  });
+
+  it("lets webUrl accept them, still refusing other schemes", () => {
+    expect(webUrl.parse("yourstore.com/product")).toBe("https://yourstore.com/product");
+    expect(webUrl.safeParse("javascript:alert(1)").success).toBe(false);
+    expect(webUrl.safeParse("not a link").success).toBe(false);
   });
 });

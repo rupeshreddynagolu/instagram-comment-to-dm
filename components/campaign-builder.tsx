@@ -24,6 +24,7 @@ import {
   type ImportRow,
 } from "@/lib/import-queue";
 import { CAMPAIGN_GOALS, DEFAULT_FOLLOW_PROMPT } from "@/lib/campaigns/defaults";
+import { normalizeWebUrl } from "@/lib/campaigns/post-url";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
 import {
   extractFirstUrl,
@@ -32,6 +33,16 @@ import {
 
 type TriggerScope = "specific" | "any" | "next";
 type MatchMode = "specific" | "any";
+
+// Readable names for the fields the API can reject, used in save errors.
+const FIELD_LABELS: Record<string, string> = {
+  trackedDestinationUrl: "Link",
+  secondaryDestinationUrl: "Second link",
+  postUrl: "Post",
+  dmMessage: "DM message",
+  openingDmMessage: "Opening DM",
+  keywords: "Keywords",
+};
 
 interface LoadedCampaign {
   id: string;
@@ -446,9 +457,9 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
       publicReplyMessages: publicReplyEnabled
         ? publicReplyMessages.map((m) => m.trim()).filter(Boolean)
         : [],
-      trackedDestinationUrl: trackedDestinationUrl.trim() || "",
+      trackedDestinationUrl: normalizeWebUrl(trackedDestinationUrl),
       linkButtonLabel: linkButtonLabel.trim() || "Open link",
-      secondaryDestinationUrl: secondaryDestinationUrl.trim() || "",
+      secondaryDestinationUrl: normalizeWebUrl(secondaryDestinationUrl),
       secondaryButtonLabel: secondaryButtonLabel.trim() || "Open link",
       requireFollow,
       followPromptMessage: requireFollow ? followPromptMessage.trim() : "",
@@ -522,7 +533,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         const firstField = fieldErrors && Object.keys(fieldErrors)[0];
         setError(
           firstField
-            ? `${firstField}: ${fieldErrors[firstField][0]}`
+            ? `${FIELD_LABELS[firstField] ?? firstField}: ${fieldErrors[firstField][0]}`
             : data.error ?? "Failed to save campaign"
         );
         if (typeof window !== "undefined")
