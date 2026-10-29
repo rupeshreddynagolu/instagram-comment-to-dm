@@ -14,7 +14,7 @@ ALTER TABLE `Automation` ADD COLUMN `dmTriggerEnabled` BOOLEAN NOT NULL DEFAULT 
     ADD COLUMN `pendingNextReel` BOOLEAN NOT NULL DEFAULT false,
     ADD COLUMN `publicReplyEnabled` BOOLEAN NOT NULL DEFAULT false,
     ADD COLUMN `publicReplyMessage` TEXT NULL,
-    ADD COLUMN `publicReplyMessages` JSON NOT NULL,
+    ADD COLUMN `publicReplyMessages` JSON NULL,
     ADD COLUMN `requireFollow` BOOLEAN NOT NULL DEFAULT false,
     MODIFY `postId` VARCHAR(191) NULL;
 
@@ -35,6 +35,10 @@ CREATE TABLE `ProcessedComment` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Existing campaigns get JSON null for the new NOT NULL column; give them the
--- same empty list a new campaign gets.
-UPDATE `Automation` SET `publicReplyMessages` = JSON_ARRAY() WHERE JSON_TYPE(`publicReplyMessages`) = 'NULL';
+-- publicReplyMessages is added as NULL, filled, then made NOT NULL. Adding a
+-- NOT NULL JSON column straight onto a table with rows fails on MariaDB,
+-- whose JSON is LONGTEXT with a json_valid() check that the empty filler
+-- value does not pass. Existing campaigns get the same empty list a new
+-- campaign gets.
+UPDATE `Automation` SET `publicReplyMessages` = JSON_ARRAY() WHERE `publicReplyMessages` IS NULL;
+ALTER TABLE `Automation` MODIFY `publicReplyMessages` JSON NOT NULL;
