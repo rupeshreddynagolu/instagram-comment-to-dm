@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
         dmsSentThisPeriod: true,
         billingProvider: true,
         currentPeriodEnd: true,
+        cancelAtPeriodEnd: true,
+        stripeCustomerId: true,
       },
     }),
     prisma.instagramAccount.findFirst({
@@ -177,10 +179,18 @@ export async function GET(request: NextRequest) {
     }))
   );
 
+  // The page only needs to know a Stripe customer exists, not its id.
+  const { stripeCustomerId, ...workspaceDetails } = workspace ?? {
+    stripeCustomerId: null,
+  };
+  const workspaceData = workspace
+    ? { ...workspaceDetails, hasStripeCustomer: Boolean(stripeCustomerId) }
+    : null;
+
   return NextResponse.json({
     success: true,
     data: {
-      workspace,
+      workspace: workspaceData,
       instagramAccount,
       instagramAccounts,
       selectedInstagramAccountId: selectedAccountId,

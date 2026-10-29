@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireEnv } from "@/lib/env";
 import { prisma } from "@/lib/db/client";
+import { billingProviderError } from "@/lib/billing/errors";
 import { hasPaidAccess } from "@/lib/billing/plans";
 import {
   cancelRazorpaySubscription,
@@ -90,19 +91,25 @@ export async function POST(request: NextRequest) {
       ? requireEnv("RAZORPAY_PLAN_AGENCY")
       : requireEnv("RAZORPAY_PLAN_PRO");
 
-  const subscription = await createRazorpaySubscription({
-    planId,
-    notes: {
-      workspaceId: context.workspaceId,
-      plan: parsed.data.plan,
-    },
-  });
+  let subscription;
+  try {
+    subscription = await createRazorpaySubscription({
+      planId,
+      notes: {
+        workspaceId: context.workspaceId,
+        plan: parsed.data.plan,
+      },
+    });
+  } catch (error) {
+    return billingProviderError("Razorpay", error);
+  }
 
   await prisma.workspace.update({
     where: { id: context.workspaceId },
     data: {
       razorpaySubscriptionId: subscription.id,
       razorpayPlanId: subscription.plan_id,
+      cancelAtPeriodEnd: false,
     },
   });
 

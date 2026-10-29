@@ -66,6 +66,9 @@ async function upsertSubscription(subscription: Stripe.Subscription) {
       stripeSubscriptionId: subscription.id,
       stripePriceId: priceId,
       currentPeriodEnd: getCurrentPeriodEnd(subscription),
+      cancelAtPeriodEnd:
+        subscription.status !== "canceled" &&
+        (subscription.cancel_at_period_end || subscription.cancel_at !== null),
     },
   });
 }

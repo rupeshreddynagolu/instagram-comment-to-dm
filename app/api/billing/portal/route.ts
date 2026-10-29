@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getBaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/db/client";
+import { billingProviderError } from "@/lib/billing/errors";
 import { getStripe } from "@/lib/stripe";
 import { canManageBilling, getCurrentWorkspaceContext } from "@/lib/workspace-access";
 
@@ -32,10 +33,14 @@ export async function POST() {
     );
   }
 
-  const portal = await getStripe().billingPortal.sessions.create({
-    customer: workspace.stripeCustomerId,
-    return_url: `${getBaseUrl()}/settings`,
-  });
+  try {
+    const portal = await getStripe().billingPortal.sessions.create({
+      customer: workspace.stripeCustomerId,
+      return_url: `${getBaseUrl()}/settings`,
+    });
 
-  return NextResponse.json({ success: true, url: portal.url });
+    return NextResponse.json({ success: true, url: portal.url });
+  } catch (error) {
+    return billingProviderError("Stripe", error);
+  }
 }

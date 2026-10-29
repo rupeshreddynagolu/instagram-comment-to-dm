@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getBaseUrl, requireEnv } from "@/lib/env";
 import { prisma } from "@/lib/db/client";
+import { billingProviderError } from "@/lib/billing/errors";
 import { hasPaidAccess } from "@/lib/billing/plans";
 import { getStripe } from "@/lib/stripe";
 import {
@@ -57,14 +58,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (
-    workspace.billingProvider === "RAZORPAY" &&
-    hasPaidAccess(workspace.subscriptionStatus)
-  ) {
+  // A second checkout while paid would start a second subscription charging
+  // the customer. Plan changes go through the provider that already bills it.
+  if (hasPaidAccess(workspace.subscriptionStatus)) {
     return NextResponse.json(
       {
         success: false,
-        error: "This workspace is billed through Razorpay. Cancel that subscription first.",
+        error:
+          workspace.billingProvider === "RAZORPAY"
+            ? "This workspace is billed through Razorpay. Cancel that subscription first."
+            : "This workspace already has a Stripe subscription. Change plans in the Billing Portal.",
       },
       { status: 409 }
     );
@@ -76,39 +79,43 @@ export async function POST(request: NextRequest) {
       ? requireEnv("STRIPE_PRICE_AGENCY")
       : requireEnv("STRIPE_PRICE_PRO");
 
-  let customerId = workspace.stripeCustomerId;
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: session.user.email,
-      name: workspace.name,
-      metadata: { workspaceId: context.workspaceId },
-    });
-    customerId = customer.id;
-    await prisma.workspace.update({
-      where: { id: context.workspaceId },
-      data: { stripeCustomerId: customerId },
-    });
-  }
+  try {
+    let customerId = workspace.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: session.user.email,
+        name: workspace.name,
+        metadata: { workspaceId: context.workspaceId },
+      });
+      customerId = customer.id;
+      await prisma.workspace.update({
+        where: { id: context.workspaceId },
+        data: { stripeCustomerId: customerId },
+      });
+    }
 
-  const checkout = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
-    allow_promotion_codes: true,
-    client_reference_id: context.workspaceId,
-    metadata: {
-      workspaceId: context.workspaceId,
-      plan: parsed.data.plan,
-    },
-    subscription_data: {
+    const checkout = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
+      client_reference_id: context.workspaceId,
       metadata: {
         workspaceId: context.workspaceId,
         plan: parsed.data.plan,
       },
-    },
-    success_url: `${getBaseUrl()}/settings?billing=success`,
-    cancel_url: `${getBaseUrl()}/settings?billing=cancelled`,
-  });
+      subscription_data: {
+        metadata: {
+          workspaceId: context.workspaceId,
+          plan: parsed.data.plan,
+        },
+      },
+      success_url: `${getBaseUrl()}/settings?billing=success`,
+      cancel_url: `${getBaseUrl()}/settings?billing=cancelled`,
+    });
 
-  return NextResponse.json({ success: true, url: checkout.url });
+    return NextResponse.json({ success: true, url: checkout.url });
+  } catch (error) {
+    return billingProviderError("Stripe", error);
+  }
 }
