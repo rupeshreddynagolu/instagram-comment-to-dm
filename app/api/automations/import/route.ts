@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/client";
 import { getWorkspaceInstagramAccount } from "@/lib/instagram-accounts";
 import { campaignLimitError } from "@/lib/billing/campaign-limit";
+import { instagramPostUrl } from "@/lib/campaigns/post-url";
 import { generateReportShareSlug } from "@/lib/reports/share";
 import { generateTrackedLinkSlug } from "@/lib/tracking/server";
 import {
@@ -12,7 +13,7 @@ import {
 
 const campaignSchema = z.object({
   postId: z.string().min(1),
-  postUrl: z.string().optional().nullable(),
+  postUrl: instagramPostUrl.optional().nullable(),
   keywords: z.array(z.string().min(1).max(50)).min(1).max(10),
   dmMessage: z.string().min(1).max(1000),
   name: z.string().max(100).optional().nullable(),

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCampaignReportBySlug } from "@/lib/reports/data";
+import { safeExternalHref } from "@/lib/campaigns/post-url";
 
 type ReportPageProps = {
   params: Promise<{ shareSlug: string }>;
@@ -283,7 +284,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
               </p>
               {report.campaign.postUrl ? (
                 <a
-                  href={report.campaign.postUrl}
+                  href={safeExternalHref(report.campaign.postUrl)}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-3 inline-flex text-sm font-semibold text-cyan-200 transition hover:text-cyan-100"

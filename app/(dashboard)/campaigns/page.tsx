@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AccountSelect, { type AccountOption } from "@/components/account-select";
 import { readCache, writeCache } from "@/lib/client-cache";
+import { safeExternalHref } from "@/lib/campaigns/post-url";
 
 interface Campaign {
   id: string;
@@ -439,7 +440,7 @@ export default function CampaignsPage() {
                   </button>
                 ) : (
                   <a
-                    href={auto.postUrl ?? "#"}
+                    href={safeExternalHref(auto.postUrl)}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
@@ -684,7 +685,7 @@ export default function CampaignsPage() {
             <div className="flex items-center gap-4 text-sm">
               {playingVideo.postUrl && (
                 <a
-                  href={playingVideo.postUrl}
+                  href={safeExternalHref(playingVideo.postUrl)}
                   target="_blank"
                   rel="noreferrer"
                   className="text-zinc-300 hover:text-white"
