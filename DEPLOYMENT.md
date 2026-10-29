@@ -1,4 +1,6 @@
-# CampaignCue Production Deployment
+# ReplyNxt Production Deployment
+
+Deploying to cPanel instead? See [docs/deploy-cpanel.md](docs/deploy-cpanel.md): one zip, one Node app, one MySQL database.
 
 The web app and the DM job runtime can run as one Node process: on `next start`, `instrumentation.ts` starts the Sidequest engine in-process. Jobs, the hourly rate limiter, and the worker heartbeat all live in MySQL (or MariaDB), so no Redis is needed.
 

@@ -129,8 +129,8 @@ describe("campaign reports", () => {
   });
 
   it("builds report URLs and branding flags", () => {
-    expect(buildReportUrl("abc123", "https://campaigncue.com/")).toBe(
-      "https://campaigncue.com/reports/abc123"
+    expect(buildReportUrl("abc123", "https://replynxt.com/")).toBe(
+      "https://replynxt.com/reports/abc123"
     );
     expect(isReportBranded("FREE", "NONE")).toBe(true);
     expect(isReportBranded("AGENCY", "ACTIVE")).toBe(false);

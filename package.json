@@ -1,11 +1,12 @@
 {
-  "name": "campaigncue",
+  "name": "replynxt",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "package:cpanel": "node scripts/package-cpanel.mjs",
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
