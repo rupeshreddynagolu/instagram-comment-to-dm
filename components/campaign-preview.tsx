@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_FOLLOW_PROMPT } from "@/lib/campaigns/defaults";
+import { DEFAULT_FOLLOW_PROMPT, DEFAULT_FOLLOW_UP } from "@/lib/campaigns/defaults";
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -455,7 +455,7 @@ function DmScreen({
                 <p className="whitespace-pre-wrap text-sm">
                   {followUpMessage.trim()
                     ? followUpMessage.replace(/\{username\}/g, SAMPLE_USER)
-                    : "Btw just wanted to say thanks for following me, I appreciate the support 🙌"}
+                    : DEFAULT_FOLLOW_UP}
                 </p>
               </div>
             </div>

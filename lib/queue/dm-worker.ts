@@ -10,7 +10,7 @@ import {
   type ProcessFollowUpJob,
 } from "./client";
 import { prisma } from "@/lib/db/client";
-import { DEFAULT_FOLLOW_PROMPT } from "@/lib/campaigns/defaults";
+import { DEFAULT_FOLLOW_PROMPT, DEFAULT_FOLLOW_UP } from "@/lib/campaigns/defaults";
 import {
   MetaApiError,
   RateLimitError,
@@ -826,7 +826,7 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
     // short thank-you. It is scheduled as its own delayed job so it can go out
     // some minutes later (followUpDelayMinutes) rather than immediately. The
     // deterministic job id dedupes repeat button taps to one follow-up per user.
-    if (automation.followUpEnabled && automation.followUpMessage?.trim()) {
+    if (automation.followUpEnabled) {
       const delayMs =
         Math.max(0, automation.followUpDelayMinutes ?? 0) * 60_000;
       await getDMQueue().add(
@@ -915,7 +915,6 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
   if (
     !automation ||
     !automation.followUpEnabled ||
-    !automation.followUpMessage?.trim() ||
     automation.instagramAccount.instagramId !== instagramAccountId ||
     !automation.instagramAccount.accessToken
   ) {
@@ -935,7 +934,8 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
       automation.instagramAccount.instagramId,
       userId,
       renderMessageWithoutLink({
-        message: automation.followUpMessage,
+        // Blank means the default the builder previews.
+        message: automation.followUpMessage?.trim() || DEFAULT_FOLLOW_UP,
         commenterName: commenterName ?? null,
       })
     );
@@ -1147,7 +1147,7 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
         // The link has been delivered, so the appreciation follow-up applies
         // here exactly as it does after a button tap. Not scheduled behind the
         // follow prompt — no link went out yet in that branch.
-        if (automation.followUpEnabled && automation.followUpMessage?.trim()) {
+        if (automation.followUpEnabled) {
           await getDMQueue().add(
             FOLLOWUP_JOB_NAME,
             {

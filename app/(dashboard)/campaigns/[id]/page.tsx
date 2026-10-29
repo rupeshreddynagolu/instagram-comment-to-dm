@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import CampaignPreview, { type PreviewTab } from "@/components/campaign-preview";
-import { DEFAULT_FOLLOW_PROMPT } from "@/lib/campaigns/defaults";
+import { DEFAULT_FOLLOW_PROMPT, DEFAULT_FOLLOW_UP } from "@/lib/campaigns/defaults";
 
 interface Campaign {
   id: string;
@@ -280,9 +280,9 @@ export default function CampaignDetailPage() {
           </Summary>
         )}
 
-        {campaign.followUpEnabled && campaign.followUpMessage && (
+        {campaign.followUpEnabled && (
           <Summary title="Then a follow-up message">
-            <FieldBox>{campaign.followUpMessage}</FieldBox>
+            <FieldBox>{campaign.followUpMessage || DEFAULT_FOLLOW_UP}</FieldBox>
             <p className="text-xs text-muted">
               {campaign.followUpDelayMinutes && campaign.followUpDelayMinutes > 0
                 ? `Sent ${campaign.followUpDelayMinutes} min after the link.`

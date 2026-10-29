@@ -23,7 +23,11 @@ import {
   IMPORT_ACCOUNT_KEY,
   type ImportRow,
 } from "@/lib/import-queue";
-import { CAMPAIGN_GOALS, DEFAULT_FOLLOW_PROMPT } from "@/lib/campaigns/defaults";
+import {
+  CAMPAIGN_GOALS,
+  DEFAULT_FOLLOW_PROMPT,
+  DEFAULT_FOLLOW_UP,
+} from "@/lib/campaigns/defaults";
 import { normalizeWebUrl } from "@/lib/campaigns/post-url";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
 import {
@@ -1009,7 +1013,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                 <textarea
                   value={followUpMessage}
                   onChange={(e) => setFollowUpMessage(e.target.value)}
-                  placeholder="Btw just wanted to say thanks for following me, I appreciate the support 🙌"
+                  placeholder={DEFAULT_FOLLOW_UP}
                   rows={3}
                   className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none resize-none"
                   maxLength={1000}

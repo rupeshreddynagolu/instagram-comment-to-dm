@@ -115,6 +115,7 @@ vi.mock("@/lib/queue/client", () => ({
 }));
 
 import { processJob } from "../lib/queue/dm-worker";
+import { DEFAULT_FOLLOW_UP } from "../lib/campaigns/defaults";
 
 const usagePeriodStart = new Date("2026-05-01T00:00:00.000Z");
 
@@ -1202,6 +1203,52 @@ describe("DM Worker — quota protection", () => {
           commentId: { startsWith: "dm:" },
         }),
       })
+    );
+  });
+});
+
+describe("DM Worker — follow-up thank-you", () => {
+  const followUpCampaign = {
+    ...mockAutomation,
+    requireFollow: false,
+    followUpEnabled: true,
+    // Left blank in the builder, which previews the default message.
+    followUpMessage: "",
+    followUpDelayMinutes: 1,
+  };
+
+  it("schedules the follow-up after a reveal even when its message was left blank", async () => {
+    mockPrisma.automation.findFirst.mockResolvedValue(followUpCampaign);
+
+    await getProcessor()(createMockPostbackJob());
+
+    expect(mockQueueAdd).toHaveBeenCalledWith(
+      "process-followup",
+      expect.objectContaining({ userId: "commenter_999", automationId: "auto_789" }),
+      expect.objectContaining({ delay: 60_000 })
+    );
+  });
+
+  it("sends the default thank-you when the follow-up message is blank", async () => {
+    mockPrisma.automation.findFirst.mockResolvedValue(followUpCampaign);
+
+    await getProcessor()({
+      name: "process-followup",
+      data: {
+        instagramAccountId: "ig_456",
+        userId: "commenter_999",
+        automationId: "auto_789",
+        commenterName: "commenter_user",
+      },
+      id: "followup_job_001",
+      attemptsMade: 0,
+    });
+
+    expect(mockSendDirectMessage).toHaveBeenCalledWith(
+      "decrypted_token",
+      "ig_456",
+      "commenter_999",
+      DEFAULT_FOLLOW_UP
     );
   });
 });
