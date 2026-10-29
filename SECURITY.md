@@ -53,6 +53,8 @@ Never commit:
 - `RESEND_API_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
+- `RAZORPAY_KEY_SECRET`
+- `RAZORPAY_WEBHOOK_SECRET`
 - `INSTAGRAM_APP_SECRET`
 - `FACEBOOK_APP_SECRET`
 - Live webhook payloads that contain user data

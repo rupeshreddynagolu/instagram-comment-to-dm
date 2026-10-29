@@ -7,6 +7,7 @@ import {
   normalizeTopKeywords,
   summarizeDmStatuses,
 } from "@/lib/tracking/analytics";
+import { isRazorpayConfigured } from "@/lib/razorpay";
 
 export async function GET(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
@@ -55,6 +56,8 @@ export async function GET(request: NextRequest) {
         plan: true,
         subscriptionStatus: true,
         dmsSentThisPeriod: true,
+        billingProvider: true,
+        currentPeriodEnd: true,
       },
     }),
     prisma.instagramAccount.findFirst({
@@ -183,6 +186,10 @@ export async function GET(request: NextRequest) {
       selectedInstagramAccountId: selectedAccountId,
       plan: effectivePlan,
       planLimits: PLAN_LIMITS[effectivePlan],
+      billingProviders: {
+        stripe: Boolean(process.env.STRIPE_SECRET_KEY),
+        razorpay: isRazorpayConfigured(),
+      },
       totalAutomations,
       activeAutomations,
       dmsSentToday,

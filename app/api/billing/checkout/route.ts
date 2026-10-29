@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getBaseUrl, requireEnv } from "@/lib/env";
 import { prisma } from "@/lib/db/client";
+import { hasPaidAccess } from "@/lib/billing/plans";
 import { getStripe } from "@/lib/stripe";
 import {
   canManageBilling,
@@ -41,13 +42,31 @@ export async function POST(request: NextRequest) {
 
   const workspace = await prisma.workspace.findUnique({
     where: { id: context.workspaceId },
-    select: { name: true, stripeCustomerId: true },
+    select: {
+      name: true,
+      stripeCustomerId: true,
+      billingProvider: true,
+      subscriptionStatus: true,
+    },
   });
 
   if (!workspace) {
     return NextResponse.json(
       { success: false, error: "Workspace not found" },
       { status: 404 }
+    );
+  }
+
+  if (
+    workspace.billingProvider === "RAZORPAY" &&
+    hasPaidAccess(workspace.subscriptionStatus)
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "This workspace is billed through Razorpay. Cancel that subscription first.",
+      },
+      { status: 409 }
     );
   }
 

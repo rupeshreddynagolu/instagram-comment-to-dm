@@ -9,6 +9,12 @@ interface SettingsData {
     plan: string;
     subscriptionStatus: string;
     dmsSentThisPeriod: number;
+    billingProvider: "STRIPE" | "RAZORPAY";
+    currentPeriodEnd: string | null;
+  };
+  billingProviders: {
+    stripe: boolean;
+    razorpay: boolean;
   };
   instagramAccount: {
     id: string;
@@ -63,6 +69,7 @@ export default function SettingsPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
   const [memberError, setMemberError] = useState<string | null>(null);
+  const [billingMessage, setBillingMessage] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -126,15 +133,49 @@ export default function SettingsPage() {
     setBusy(null);
   }
 
-  async function startCheckout(plan: "PRO" | "AGENCY") {
-    setBusy(plan);
-    const res = await fetch("/api/billing/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan }),
-    });
+  async function startCheckout(
+    plan: "PRO" | "AGENCY",
+    provider: "stripe" | "razorpay"
+  ) {
+    setBillingMessage(null);
+    setBusy(`${provider}:${plan}`);
+    const res = await fetch(
+      provider === "razorpay"
+        ? "/api/billing/razorpay/checkout"
+        : "/api/billing/checkout",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      }
+    );
     const payload = await res.json();
-    if (payload.url) window.location.assign(payload.url);
+    if (payload.url) {
+      window.location.assign(payload.url);
+      return;
+    }
+    setBillingMessage(payload.error ?? "Could not start checkout");
+    setBusy(null);
+  }
+
+  async function cancelRazorpaySubscription() {
+    if (!confirm("Cancel your subscription? You keep paid features until the current billing cycle ends.")) {
+      return;
+    }
+
+    setBillingMessage(null);
+    setBusy("cancel");
+    const res = await fetch("/api/billing/razorpay/cancel", { method: "POST" });
+    const payload = await res.json();
+    if (payload.success) {
+      setBillingMessage(
+        payload.accessUntil
+          ? `Subscription cancelled. Paid features stay on until ${new Date(payload.accessUntil).toLocaleDateString()}.`
+          : "Subscription cancelled."
+      );
+    } else {
+      setBillingMessage(payload.error ?? "Could not cancel the subscription");
+    }
     setBusy(null);
   }
 
@@ -158,6 +199,8 @@ export default function SettingsPage() {
   const memberLimit =
     data?.planLimits.maxWorkspaceMembers ?? membersData?.members.length ?? 1;
   const pendingInviteCount = membersData?.invitations.length ?? 0;
+  const billedByRazorpay =
+    data?.workspace.billingProvider === "RAZORPAY" && data.plan !== "FREE";
   const memberLimitReached =
     (membersData?.members.length ?? 0) + pendingInviteCount >= memberLimit;
   const accountLimitReached = accounts.length >= accountLimit;
@@ -375,15 +418,31 @@ export default function SettingsPage() {
                 {usage} DMs used this month
               </p>
             </div>
-            <button
-              onClick={openBillingPortal}
-              disabled={busy === "portal"}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:border-border-hover transition-colors disabled:opacity-50"
-            >
-              Billing Portal
-            </button>
+            {billedByRazorpay ? (
+              <button
+                onClick={cancelRazorpaySubscription}
+                disabled={busy === "cancel"}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:border-border-hover transition-colors disabled:opacity-50"
+              >
+                {busy === "cancel" ? "Cancelling..." : "Cancel Subscription"}
+              </button>
+            ) : (
+              data?.billingProviders.stripe && (
+                <button
+                  onClick={openBillingPortal}
+                  disabled={busy === "portal"}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:border-border-hover transition-colors disabled:opacity-50"
+                >
+                  Billing Portal
+                </button>
+              )
+            )}
           </div>
         </div>
+
+        {billingMessage && (
+          <p className="mt-3 text-xs text-muted">{billingMessage}</p>
+        )}
 
         <div className="mt-4 space-y-3">
           {[
@@ -398,13 +457,26 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium text-foreground">{tier.plan}</p>
                 <p className="text-xs text-muted">{tier.features}</p>
               </div>
-              <button
-                onClick={() => startCheckout(tier.plan)}
-                disabled={busy === tier.plan}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
-              >
-                {busy === tier.plan ? "Opening..." : tier.price}
-              </button>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                {data?.billingProviders.razorpay && (
+                  <button
+                    onClick={() => startCheckout(tier.plan, "razorpay")}
+                    disabled={busy !== null}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:border-border-hover transition-colors disabled:opacity-50"
+                  >
+                    {busy === `razorpay:${tier.plan}` ? "Opening..." : "INR · UPI"}
+                  </button>
+                )}
+                {data?.billingProviders.stripe && (
+                  <button
+                    onClick={() => startCheckout(tier.plan, "stripe")}
+                    disabled={busy !== null}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
+                  >
+                    {busy === `stripe:${tier.plan}` ? "Opening..." : `${tier.price} · card`}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -46,7 +46,8 @@ export async function GET() {
       take: 10,
       select: {
         id: true,
-        stripeEventId: true,
+        provider: true,
+        eventId: true,
         type: true,
         processedAt: true,
       },

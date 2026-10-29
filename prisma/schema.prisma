@@ -77,6 +77,13 @@ model Workspace {
   stripeCustomerId     String?             @unique
   stripeSubscriptionId String?             @unique
   stripePriceId        String?
+  // Which provider owns the subscription. A workspace pays through one at a
+  // time; webhooks from the other provider cannot change its plan while it
+  // has paid access.
+  billingProvider        BillingProvider @default(STRIPE)
+  razorpayCustomerId     String?
+  razorpaySubscriptionId String?         @unique
+  razorpayPlanId         String?
   currentPeriodEnd     DateTime?
   usagePeriodStart     DateTime            @default(now())
   dmsSentThisPeriod    Int                 @default(0)
@@ -272,13 +279,15 @@ model WebhookEvent {
 model BillingEvent {
   id          String   @id @default(cuid())
   workspaceId String?
-  stripeEventId String @unique
+  provider    BillingProvider @default(STRIPE)
+  eventId     String
   type        String
   payload     Json
   processedAt DateTime @default(now())
 
   workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@unique([provider, eventId])
   @@index([workspaceId])
 }
 
@@ -343,6 +352,11 @@ enum Plan {
   FREE
   PRO
   AGENCY
+}
+
+enum BillingProvider {
+  STRIPE
+  RAZORPAY
 }
 
 enum SubscriptionStatus {
