@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { billingProviderError } from "@/lib/billing/errors";
 import { syncRazorpaySubscription } from "@/lib/billing/providers";
 import { cancelRazorpaySubscription } from "@/lib/razorpay";
 import {
@@ -40,11 +41,23 @@ export async function POST() {
     );
   }
 
-  const subscription = await cancelRazorpaySubscription(
-    workspace.razorpaySubscriptionId,
-    { atCycleEnd: true }
-  );
+  let subscription;
+  try {
+    subscription = await cancelRazorpaySubscription(
+      workspace.razorpaySubscriptionId,
+      { atCycleEnd: true }
+    );
+  } catch (error) {
+    return billingProviderError("Razorpay", error);
+  }
   await syncRazorpaySubscription(subscription);
+
+  // Razorpay keeps the subscription "active" until the cycle ends and its
+  // entity does not show the pending cancellation, so it is recorded here.
+  await prisma.workspace.update({
+    where: { id: context.workspaceId },
+    data: { cancelAtPeriodEnd: true },
+  });
 
   return NextResponse.json({
     success: true,

@@ -85,6 +85,8 @@ model Workspace {
   razorpaySubscriptionId String?         @unique
   razorpayPlanId         String?
   currentPeriodEnd     DateTime?
+  // The subscription is cancelled but stays paid until currentPeriodEnd.
+  cancelAtPeriodEnd    Boolean             @default(false)
   usagePeriodStart     DateTime            @default(now())
   dmsSentThisPeriod    Int                 @default(0)
 

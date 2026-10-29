@@ -11,6 +11,11 @@ import type {
 } from "@/lib/razorpay";
 
 const PAID_STATUSES: SubscriptionStatus[] = ["ACTIVE", "TRIALING"];
+const ENDED_STATUSES: RazorpaySubscriptionStatus[] = [
+  "cancelled",
+  "completed",
+  "expired",
+];
 
 /**
  * A workspace pays through one provider at a time. A provider's webhook may
@@ -74,6 +79,11 @@ export async function syncRazorpaySubscription(
       currentPeriodEnd: subscription.current_end
         ? new Date(subscription.current_end * 1000)
         : null,
+      // A pending cancellation is recorded by the cancel route; once the
+      // subscription has actually ended there is nothing pending any more.
+      ...(ENDED_STATUSES.includes(subscription.status)
+        ? { cancelAtPeriodEnd: false }
+        : {}),
     },
   });
 }

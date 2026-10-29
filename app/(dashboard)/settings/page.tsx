@@ -11,6 +11,8 @@ interface SettingsData {
     dmsSentThisPeriod: number;
     billingProvider: "STRIPE" | "RAZORPAY";
     currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+    hasStripeCustomer: boolean;
   };
   billingProviders: {
     stripe: boolean;
@@ -59,6 +61,27 @@ interface WorkspaceMembersData {
   }>;
 }
 
+// Billing routes answer with JSON, but a crashed route or a proxy error page
+// does not. Reading the body defensively keeps the page from throwing and
+// leaving its buttons stuck.
+async function readPayload(
+  res: Response
+): Promise<{ success?: boolean; url?: string; error?: string; accessUntil?: string }> {
+  try {
+    return await res.json();
+  } catch {
+    return { error: `Request failed (${res.status}). Try again in a moment.` };
+  }
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function SettingsPage() {
   const [data, setData] = useState<SettingsData | null>(null);
   const [membersData, setMembersData] = useState<WorkspaceMembersData | null>(
@@ -82,6 +105,12 @@ export default function SettingsPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  async function refreshStats() {
+    const res = await fetch("/api/dashboard/stats");
+    const payload = await res.json().catch(() => null);
+    if (payload?.success) setData(payload.data);
+  }
 
   async function refreshMembers() {
     const res = await fetch("/api/workspace/members");
@@ -149,7 +178,7 @@ export default function SettingsPage() {
         body: JSON.stringify({ plan }),
       }
     );
-    const payload = await res.json();
+    const payload = await readPayload(res);
     if (payload.url) {
       window.location.assign(payload.url);
       return;
@@ -166,13 +195,10 @@ export default function SettingsPage() {
     setBillingMessage(null);
     setBusy("cancel");
     const res = await fetch("/api/billing/razorpay/cancel", { method: "POST" });
-    const payload = await res.json();
+    const payload = await readPayload(res);
     if (payload.success) {
-      setBillingMessage(
-        payload.accessUntil
-          ? `Subscription cancelled. Paid features stay on until ${new Date(payload.accessUntil).toLocaleDateString()}.`
-          : "Subscription cancelled."
-      );
+      setBillingMessage(null);
+      await refreshStats();
     } else {
       setBillingMessage(payload.error ?? "Could not cancel the subscription");
     }
@@ -181,9 +207,14 @@ export default function SettingsPage() {
 
   async function openBillingPortal() {
     setBusy("portal");
+    setBillingMessage(null);
     const res = await fetch("/api/billing/portal", { method: "POST" });
-    const payload = await res.json();
-    if (payload.url) window.location.assign(payload.url);
+    const payload = await readPayload(res);
+    if (payload.url) {
+      window.location.assign(payload.url);
+      return;
+    }
+    setBillingMessage(payload.error ?? "Could not open the billing portal");
     setBusy(null);
   }
 
@@ -199,8 +230,17 @@ export default function SettingsPage() {
   const memberLimit =
     data?.planLimits.maxWorkspaceMembers ?? membersData?.members.length ?? 1;
   const pendingInviteCount = membersData?.invitations.length ?? 0;
-  const billedByRazorpay =
-    data?.workspace.billingProvider === "RAZORPAY" && data.plan !== "FREE";
+  const isPaid = Boolean(data) && data?.plan !== "FREE";
+  const billingProvider = data?.workspace.billingProvider;
+  const cancelPending = isPaid && Boolean(data?.workspace.cancelAtPeriodEnd);
+  const periodEnd = data?.workspace.currentPeriodEnd ?? null;
+  // Razorpay has no hosted portal, so its subscribers cancel here.
+  const canCancelHere = isPaid && billingProvider === "RAZORPAY" && !cancelPending;
+  // Stripe's portal needs a Stripe customer; a Razorpay workspace has none.
+  const canOpenPortal =
+    Boolean(data?.billingProviders.stripe) &&
+    billingProvider === "STRIPE" &&
+    Boolean(data?.workspace.hasStripeCustomer);
   const memberLimitReached =
     (membersData?.members.length ?? 0) + pendingInviteCount >= memberLimit;
   const accountLimitReached = accounts.length >= accountLimit;
@@ -417,8 +457,20 @@ export default function SettingsPage() {
               <p className="text-xs text-muted mt-0.5">
                 {usage} DMs used this month
               </p>
+              {cancelPending && (
+                <p className="text-xs text-warning mt-1">
+                  Cancelled · paid features stay on until{" "}
+                  {periodEnd ? formatDate(periodEnd) : "the end of this billing period"}
+                </p>
+              )}
+              {isPaid && !cancelPending && periodEnd && (
+                <p className="text-xs text-muted mt-1">
+                  Renews {formatDate(periodEnd)} via{" "}
+                  {billingProvider === "RAZORPAY" ? "Razorpay" : "Stripe"}
+                </p>
+              )}
             </div>
-            {billedByRazorpay ? (
+            {canCancelHere ? (
               <button
                 onClick={cancelRazorpaySubscription}
                 disabled={busy === "cancel"}
@@ -427,13 +479,13 @@ export default function SettingsPage() {
                 {busy === "cancel" ? "Cancelling..." : "Cancel Subscription"}
               </button>
             ) : (
-              data?.billingProviders.stripe && (
+              canOpenPortal && (
                 <button
                   onClick={openBillingPortal}
                   disabled={busy === "portal"}
                   className="px-4 py-2 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:border-border-hover transition-colors disabled:opacity-50"
                 >
-                  Billing Portal
+                  {busy === "portal" ? "Opening..." : "Billing Portal"}
                 </button>
               )
             )}
@@ -457,26 +509,40 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium text-foreground">{tier.plan}</p>
                 <p className="text-xs text-muted">{tier.features}</p>
               </div>
-              <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                {data?.billingProviders.razorpay && (
-                  <button
-                    onClick={() => startCheckout(tier.plan, "razorpay")}
-                    disabled={busy !== null}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:border-border-hover transition-colors disabled:opacity-50"
-                  >
-                    {busy === `razorpay:${tier.plan}` ? "Opening..." : "INR · UPI"}
-                  </button>
-                )}
-                {data?.billingProviders.stripe && (
-                  <button
-                    onClick={() => startCheckout(tier.plan, "stripe")}
-                    disabled={busy !== null}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
-                  >
-                    {busy === `stripe:${tier.plan}` ? "Opening..." : `${tier.price} · card`}
-                  </button>
-                )}
-              </div>
+              {isPaid ? (
+                data?.plan === tier.plan ? (
+                  <span className="shrink-0 px-3 py-1 rounded-full text-xs font-semibold border border-accent/30 text-accent">
+                    Current plan
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-xs text-muted text-right">
+                    {billingProvider === "RAZORPAY"
+                      ? "Available after your current plan ends"
+                      : "Switch plans in the Billing Portal"}
+                  </span>
+                )
+              ) : (
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  {data?.billingProviders.razorpay && (
+                    <button
+                      onClick={() => startCheckout(tier.plan, "razorpay")}
+                      disabled={busy !== null}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:border-border-hover transition-colors disabled:opacity-50"
+                    >
+                      {busy === `razorpay:${tier.plan}` ? "Opening..." : "INR · UPI"}
+                    </button>
+                  )}
+                  {data?.billingProviders.stripe && (
+                    <button
+                      onClick={() => startCheckout(tier.plan, "stripe")}
+                      disabled={busy !== null}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
+                    >
+                      {busy === `stripe:${tier.plan}` ? "Opening..." : `${tier.price} · card`}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
