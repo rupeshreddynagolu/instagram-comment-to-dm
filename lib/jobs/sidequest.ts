@@ -29,7 +29,22 @@ export function sidequestConfig(): SidequestConfig {
       // Store job timestamps in UTC. mysql2 defaults to the Node process's
       // local zone, which differs from the database's on many hosts and would
       // skew every "available_at <= now" comparison made in SQL.
-      config: { connection: { uri: databaseUrl, timezone: "Z" } },
+      config: {
+        connection: { uri: databaseUrl, timezone: "Z" },
+        pool: {
+          // Sidequest creates its own tables. On hosts that default to MyISAM
+          // they would get no transactions or row locks, which job claiming
+          // relies on, so make this pool's new tables InnoDB.
+          afterCreate(
+            conn: { query(sql: string, cb: (error: Error | null) => void): void },
+            done: (error: Error | null, conn: unknown) => void
+          ) {
+            conn.query("SET SESSION default_storage_engine=InnoDB", (error) =>
+              done(error, conn)
+            );
+          },
+        },
+      },
     },
     queues: [{ name: DM_QUEUE, concurrency: 5 }],
     maxConcurrentJobs: 5,

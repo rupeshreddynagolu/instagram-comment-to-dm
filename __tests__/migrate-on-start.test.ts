@@ -33,13 +33,24 @@ function writeMigration(name: string, sql: string) {
 
 // In-memory stand-in for MySQL: understands the runner's bookkeeping queries
 // and records every other statement as an executed migration script.
-function fakeConnection(rows: Row[], failOn?: string) {
+function fakeConnection(
+  rows: Row[],
+  failOn?: string,
+  tables: { TABLE_NAME: string; ENGINE: string }[] = []
+) {
   const executed: string[] = [];
+  const session: string[] = [];
   const conn: MigrationConnection = {
     query: vi.fn(async (sql: string, values: unknown[] = []) => {
       if (sql.startsWith("SELECT GET_LOCK")) return [{ acquired: 1 }];
       if (sql.startsWith("SELECT RELEASE_LOCK")) return [];
       if (sql.includes("CREATE TABLE IF NOT EXISTS _prisma_migrations")) return [];
+      if (sql.startsWith("SET SESSION")) {
+        session.push(sql);
+        return [];
+      }
+      if (sql.includes("information_schema.TABLES")) return tables;
+      if (sql.includes("information_schema.REFERENTIAL_CONSTRAINTS")) return [];
       if (sql.startsWith("SELECT migration_name")) return rows;
       if (sql.startsWith("INSERT INTO _prisma_migrations")) {
         const [id, checksum, migration_name] = values as string[];
@@ -60,7 +71,7 @@ function fakeConnection(rows: Row[], failOn?: string) {
     }),
     end: vi.fn(async () => {}),
   };
-  return { conn, executed };
+  return { conn, executed, session };
 }
 
 beforeEach(() => {
@@ -135,5 +146,26 @@ describe("applyPendingMigrations", () => {
     const broken = rows.find((r) => r.migration_name === "20260102_broken")!;
     expect(broken.finished_at).toBeNull();
     expect(broken.logs).toContain("syntax error");
+  });
+
+  it("creates new tables as InnoDB on hosts that default to MyISAM", async () => {
+    writeMigration("20260101_first", "CREATE TABLE a (id INT);");
+    const { conn, session } = fakeConnection([]);
+
+    await applyPendingMigrations(dir, async () => conn);
+
+    expect(session).toEqual(["SET SESSION default_storage_engine=InnoDB"]);
+  });
+
+  it("converts MyISAM tables left by earlier starts", async () => {
+    writeMigration("20260101_first", "CREATE TABLE a (id INT);");
+    const { conn, executed } = fakeConnection([], undefined, [
+      { TABLE_NAME: "a", ENGINE: "MyISAM" },
+    ]);
+
+    const result = await applyPendingMigrations(dir, async () => conn);
+
+    expect(result.converted).toEqual(["a"]);
+    expect(executed).toContain("ALTER TABLE `a` ENGINE=InnoDB");
   });
 });
