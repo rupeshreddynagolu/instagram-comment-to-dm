@@ -5,3 +5,12 @@
 
 export const DEFAULT_FOLLOW_PROMPT =
   "quick favor before i send your link: follow this account, then tap the button below and i'll send it right over";
+
+/** The goals a campaign can be filed under; the templates use the same set. */
+export const CAMPAIGN_GOALS = [
+  "Lead magnet delivery",
+  "Product link request",
+  "Price or availability reply",
+  "Launch waitlist",
+  "Agency client campaign",
+] as const;

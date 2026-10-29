@@ -8,18 +8,33 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AccountSelect, { type AccountOption } from "@/components/account-select";
+import { readCache, writeCache } from "@/lib/client-cache";
 
 interface Campaign {
   id: string;
   name: string;
   goal: string | null;
-  postId: string;
+  postId: string | null;
   postUrl: string | null;
+  pendingNextReel: boolean;
+  matchAnyPost: boolean;
   keywords: string[];
+  matchAnyWord: boolean;
   dmMessage: string;
+  openingDmEnabled: boolean;
+  openingDmMessage: string | null;
+  openingDmButtonLabel: string | null;
+  publicReplyEnabled: boolean;
+  publicReplyMessage: string | null;
+  publicReplyMessages: string[];
+  requireFollow: boolean;
+  followPromptMessage: string | null;
+  followPromptButtonLabel: string | null;
   isActive: boolean;
   wholeWordMatch: boolean;
+  instagramAccountId: string;
   instagramAccount: {
     username: string;
     instagramId: string;
@@ -32,6 +47,7 @@ interface Campaign {
   trackedLinks: Array<{
     id: string;
     slug: string;
+    label: string | null;
     destinationUrl: string;
     trackedUrl: string;
     _count: { clicks: number };
@@ -47,10 +63,27 @@ interface Campaign {
 }
 
 export default function CampaignsPage() {
+  const router = useRouter();
   const [automations, setAutomations] = useState<Campaign[]>([]);
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState("all");
   const [loading, setLoading] = useState(true);
+  // postId -> current thumbnail URL, fetched live (Instagram URLs expire, so
+  // they are never stored on the campaign).
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
+  // postId -> video URL for reels, so a campaign thumbnail can play on click.
+  const [videos, setVideos] = useState<Record<string, string>>({});
+  // The reel currently playing in the lightbox (null when closed).
+  const [playingVideo, setPlayingVideo] = useState<{
+    url: string;
+    postUrl: string | null;
+  } | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused">(
+    "all"
+  );
 
   const fetchAutomations = useCallback(async () => {
     try {
@@ -58,7 +91,10 @@ export default function CampaignsPage() {
       if (selectedAccountId !== "all") {
         params.set("instagramAccountId", selectedAccountId);
       }
-      const res = await fetch(`/api/automations${params.size ? `?${params}` : ""}`);
+      const res = await fetch(
+        `/api/automations${params.size ? `?${params}` : ""}`,
+        { cache: "no-store" }
+      );
       const data = await res.json();
       if (data.success) setAutomations(data.data);
     } catch (err) {
@@ -83,6 +119,78 @@ export default function CampaignsPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [fetchAutomations]);
+
+  // Fetch fresh post thumbnails (and reel video URLs) for the accounts in view
+  // and map them by postId. Cache-first so they show instantly on a return
+  // visit. Instagram URLs expire, so they are never stored on the campaign.
+  useEffect(() => {
+    if (automations.length === 0) return;
+    let cancelled = false;
+    const accountIds = Array.from(
+      new Set(automations.map((a) => a.instagramAccountId))
+    ).sort();
+    const cacheKey = `ig-media:${accountIds.join(",")}`;
+
+    const cached = readCache<{
+      thumbs: Record<string, string>;
+      videos: Record<string, string>;
+    }>(cacheKey, 15 * 60 * 1000);
+    // Hydrating state from cache is a legitimate effect use here.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (cached.data) {
+      setThumbnails(cached.data.thumbs);
+      setVideos(cached.data.videos);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    Promise.all(
+      accountIds.map((accountId) =>
+        fetch(`/api/instagram/posts?instagramAccountId=${accountId}&limit=50`)
+          .then((res) => res.json())
+          .then((payload) =>
+            payload.success
+              ? (payload.data as {
+                  id: string;
+                  media_type?: string;
+                  media_url?: string;
+                  thumbnail_url?: string;
+                }[])
+              : []
+          )
+          .catch(() => [])
+      )
+    ).then((lists) => {
+      if (cancelled) return;
+      const thumbs: Record<string, string> = {};
+      const vids: Record<string, string> = {};
+      for (const list of lists) {
+        for (const media of list) {
+          const url = media.thumbnail_url ?? media.media_url;
+          if (url) thumbs[media.id] = url;
+          if (media.media_type === "VIDEO" && media.media_url) {
+            vids[media.id] = media.media_url;
+          }
+        }
+      }
+      setThumbnails(thumbs);
+      setVideos(vids);
+      writeCache(cacheKey, { thumbs, videos: vids });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [automations]);
+
+  // Close the reel lightbox on Escape.
+  useEffect(() => {
+    if (!playingVideo) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPlayingVideo(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [playingVideo]);
 
   function handleAccountChange(accountId: string) {
     setLoading(true);
@@ -113,13 +221,26 @@ export default function CampaignsPage() {
       });
       setAutomations((prev) =>
         prev.map((a) =>
-          a.id === id
-            ? { ...a, reportShareEnabled: !reportShareEnabled }
-            : a
+          a.id === id ? { ...a, reportShareEnabled: !reportShareEnabled } : a
         )
       );
     } catch (err) {
       console.error("Failed to toggle report:", err);
+    }
+  }
+
+  async function copyReelUrl(auto: Campaign) {
+    setMenuOpenId(null);
+    if (!auto.postUrl) return;
+    try {
+      await navigator.clipboard.writeText(auto.postUrl);
+      setCopiedId(auto.id);
+      window.setTimeout(
+        () => setCopiedId((cur) => (cur === auto.id ? null : cur)),
+        1500
+      );
+    } catch (err) {
+      console.error("Failed to copy reel URL:", err);
     }
   }
 
@@ -133,15 +254,67 @@ export default function CampaignsPage() {
     }
   }
 
+  async function duplicateAutomation(auto: Campaign) {
+    setMenuOpenId(null);
+    const specific = !auto.matchAnyPost && !auto.pendingNextReel;
+    try {
+      const res = await fetch("/api/automations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${auto.name} copy`,
+          instagramAccountId: auto.instagramAccountId,
+          postId: specific ? auto.postId : null,
+          postUrl: specific ? auto.postUrl : null,
+          matchAnyPost: auto.matchAnyPost,
+          pendingNextReel: auto.pendingNextReel,
+          matchAnyWord: auto.matchAnyWord,
+          keywords: auto.keywords,
+          dmMessage: auto.dmMessage,
+          openingDmEnabled: auto.openingDmEnabled,
+          openingDmMessage: auto.openingDmMessage,
+          openingDmButtonLabel: auto.openingDmButtonLabel,
+          publicReplyEnabled: auto.publicReplyEnabled,
+          publicReplyMessages: auto.publicReplyMessages,
+          trackedDestinationUrl: auto.trackedLinks[0]?.destinationUrl ?? "",
+          secondaryDestinationUrl: auto.trackedLinks[1]?.destinationUrl ?? "",
+          secondaryButtonLabel: auto.trackedLinks[1]?.label ?? "Open link",
+          requireFollow: auto.requireFollow,
+          followPromptMessage: auto.followPromptMessage,
+          followPromptButtonLabel: auto.followPromptButtonLabel,
+          wholeWordMatch: auto.wholeWordMatch,
+          isActive: false,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) void fetchAutomations();
+      else console.error("Duplicate failed:", data.error);
+    } catch (err) {
+      console.error("Failed to duplicate:", err);
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="glass rounded-2xl p-6 h-36 animate-pulse" />
+          <div key={i} className="panel rounded p-6 h-36" />
         ))}
       </div>
     );
   }
+
+  const query = search.trim().toLowerCase();
+  const filtered = automations.filter((a) => {
+    if (statusFilter === "active" && !a.isActive) return false;
+    if (statusFilter === "paused" && a.isActive) return false;
+    if (!query) return true;
+    return (
+      a.name.toLowerCase().includes(query) ||
+      a.keywords.some((k) => k.toLowerCase().includes(query)) ||
+      a.dmMessage.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -149,10 +322,14 @@ export default function CampaignsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm text-muted">
-            {automations.length} campaign{automations.length !== 1 ? "s" : ""}
+            {filtered.length}
+            {filtered.length !== automations.length
+              ? ` of ${automations.length}`
+              : ""}{" "}
+            campaign{automations.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-wrap items-end gap-3">
           {accounts.length > 1 && (
             <AccountSelect
               accounts={accounts}
@@ -161,46 +338,128 @@ export default function CampaignsPage() {
             />
           )}
           <Link
-            href="/campaigns/new"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            href="/campaigns/import"
+            className="flex-1 rounded border border-border px-4 py-2 text-center text-sm font-medium text-muted hover:text-foreground sm:flex-none"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
+            Import
+          </Link>
+          <Link
+            href="/campaigns/new"
+            className="flex-1 rounded bg-accent px-4 py-2 text-center text-sm font-medium text-white hover:bg-accent-hover sm:flex-none"
+          >
             New Campaign
           </Link>
         </div>
       </div>
 
+      {/* Search + status filter */}
+      {automations.length > 0 && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search campaigns by name, keyword, or message…"
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
+          />
+          <div className="inline-flex shrink-0 rounded-lg bg-surface p-1">
+            {(["all", "active", "paused"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStatusFilter(s)}
+                className={`rounded-md px-3 py-1.5 text-sm capitalize transition-colors ${
+                  statusFilter === s
+                    ? "bg-background font-medium text-foreground ring-1 ring-accent/40"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Empty state */}
       {automations.length === 0 && (
-        <div className="glass rounded-2xl p-12 text-center animate-fade-in">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 mb-4">
-            <svg className="w-8 h-8 text-accent" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-          </div>
+        <div className="panel rounded p-8 text-center sm:p-12">
           <h3 className="text-lg font-semibold mb-2">No campaigns yet</h3>
           <p className="text-sm text-muted mb-6 max-w-sm mx-auto">
             Create your first comment-to-DM campaign to turn a post or reel into a measurable conversation flow.
           </p>
           <Link
             href="/campaigns/new"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-sm font-semibold text-white hover:bg-accent-hover transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded bg-accent text-sm font-semibold text-white hover:bg-accent-hover transition-colors"
           >
             Create Campaign
           </Link>
         </div>
       )}
 
+      {/* No matches for the current filter */}
+      {automations.length > 0 && filtered.length === 0 && (
+        <div className="panel rounded p-8 text-center text-sm text-muted">
+          No campaigns match your search.
+        </div>
+      )}
+
       {/* Campaign cards */}
-      <div className="space-y-4 stagger">
-        {automations.map((auto) => (
-          <div key={auto.id} className="glass rounded-2xl p-6 animate-fade-in hover:border-border-hover transition-all">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-3">
-                  <h3 className="text-base font-semibold truncate">{auto.name}</h3>
+      <div className="space-y-3">
+        {filtered.map((auto) => {
+          const videoUrl = auto.postId ? videos[auto.postId] : undefined;
+          return (
+          <div
+            key={auto.id}
+            onClick={() => router.push(`/campaigns/${auto.id}`)}
+            className="panel rounded p-4 hover:border-border-hover transition-all cursor-pointer"
+          >
+            {/* Wraps rather than compressing: on a phone the action buttons drop
+                to their own line instead of squeezing the campaign summary. */}
+            <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
+              {auto.postId && thumbnails[auto.postId] && (
+                videoUrl ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPlayingVideo({ url: videoUrl, postUrl: auto.postUrl });
+                    }}
+                    aria-label="Play reel preview"
+                    className="shrink-0"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={thumbnails[auto.postId]}
+                      alt="Campaign reel"
+                      className="w-12 h-12 rounded object-cover border border-border hover:border-border-hover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  </button>
+                ) : (
+                  <a
+                    href={auto.postUrl ?? "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="shrink-0"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={thumbnails[auto.postId]}
+                      alt="Campaign post"
+                      className="w-12 h-12 rounded object-cover border border-border"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  </a>
+                )
+              )}
+              <div className="min-w-[12rem] flex-1">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <h3 className="text-sm font-semibold truncate">{auto.name}</h3>
                   <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs text-muted">
                     @{auto.instagramAccount.username}
                   </span>
@@ -208,21 +467,36 @@ export default function CampaignsPage() {
                     className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                       auto.isActive
                         ? "bg-success/10 text-success"
-                        : "bg-zinc-500/10 text-zinc-400"
+                        : "bg-zinc-500/10 text-muted"
                     }`}
                   >
                     {auto.isActive ? "Active" : "Paused"}
                   </span>
+                  {auto.pendingNextReel && (
+                    <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-warning">
+                      Waiting for next reel
+                    </span>
+                  )}
+                  {auto.requireFollow && (
+                    <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                      Follow gate
+                    </span>
+                  )}
+                  {auto.trackedLinks.length >= 2 && (
+                    <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                      2 links
+                    </span>
+                  )}
                 </div>
 
                 {auto.goal && (
-                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-accent">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-accent">
                     {auto.goal}
                   </p>
                 )}
 
                 {/* Keywords */}
-                <div className="flex flex-wrap gap-1.5 mb-3">
+                <div className="flex flex-wrap gap-1.5 mb-2">
                   {auto.keywords.map((kw) => (
                     <span
                       key={kw}
@@ -236,8 +510,23 @@ export default function CampaignsPage() {
                 {/* DM preview */}
                 <p className="text-sm text-muted truncate">&ldquo;{auto.dmMessage}&rdquo;</p>
 
+                {/* Tracked link sent */}
+                {auto.trackedLinks[0]?.trackedUrl && (
+                  <p className="mt-2 truncate font-mono text-xs text-zinc-500">
+                    {auto.trackedLinks[0].trackedUrl}
+                  </p>
+                )}
+
                 {/* Stats */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-xs text-zinc-500">
+                  <span className="font-medium text-foreground">
+                    {auto._count.dmLogs} runs
+                  </span>
+                  <span>·</span>
+                  <span className="font-medium text-foreground">
+                    {auto.analytics.ctr}% CTR
+                  </span>
+                  <span>·</span>
                   <span>{auto.analytics.sent} sent</span>
                   <span>·</span>
                   <span>{auto.analytics.skipped} skipped</span>
@@ -245,34 +534,7 @@ export default function CampaignsPage() {
                   <span>{auto.analytics.failed} failed</span>
                   <span>·</span>
                   <span>{auto.analytics.clicks} clicks</span>
-                  <span>·</span>
-                  <span>{auto.analytics.ctr}% CTR</span>
-                  <span>·</span>
-                  <span>{auto.wholeWordMatch ? "Whole word" : "Partial match"}</span>
                 </div>
-
-                {auto.trackedLinks[0] && (
-                  <div className="mt-4 rounded-xl border border-border bg-surface/70 p-3">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                          Tracked link
-                        </p>
-                        <p className="mt-1 truncate text-xs text-muted">
-                          {auto.trackedLinks[0].trackedUrl}
-                        </p>
-                      </div>
-                      <a
-                        href={auto.trackedLinks[0].trackedUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-border-hover hover:text-foreground"
-                      >
-                        Open
-                      </a>
-                    </div>
-                  </div>
-                )}
 
                 {auto.reportUrl && (
                   <div className="mt-4 rounded-xl border border-border bg-surface/70 p-3">
@@ -336,13 +598,25 @@ export default function CampaignsPage() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2">
+              <div
+                className="ml-auto flex items-center gap-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Copy reel URL */}
+                {auto.postUrl && (
+                  <button
+                    onClick={() => void copyReelUrl(auto)}
+                    className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:border-border-hover hover:text-foreground"
+                  >
+                    {copiedId === auto.id ? "Copied!" : "Copy URL"}
+                  </button>
+                )}
                 {/* Toggle */}
                 <button
                   onClick={() => toggleActive(auto.id, auto.isActive)}
                   className={`
                     relative w-11 h-6 rounded-full transition-colors
-                    ${auto.isActive ? "bg-accent" : "bg-zinc-700"}
+                    ${auto.isActive ? "bg-accent" : "bg-zinc-300"}
                   `}
                 >
                   <span
@@ -353,20 +627,90 @@ export default function CampaignsPage() {
                   />
                 </button>
 
-                {/* Delete */}
-                <button
-                  onClick={() => deleteAutomation(auto.id)}
-                  className="p-2 rounded-lg text-zinc-500 hover:text-error hover:bg-error/10 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                  </svg>
-                </button>
+                {/* Kebab menu */}
+                <div className="relative">
+                  <button
+                    onClick={() =>
+                      setMenuOpenId((cur) => (cur === auto.id ? null : auto.id))
+                    }
+                    aria-label="More actions"
+                    className="px-2 py-1 rounded text-lg leading-none text-muted hover:text-foreground"
+                  >
+                    ⋯
+                  </button>
+                  {menuOpenId === auto.id && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setMenuOpenId(null)}
+                      />
+                      <div className="absolute right-0 z-20 mt-1 w-36 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+                        <button
+                          onClick={() => void duplicateAutomation(auto)}
+                          className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-surface-hover"
+                        >
+                          Duplicate
+                        </button>
+                        <button
+                          onClick={() => {
+                            setMenuOpenId(null);
+                            void deleteAutomation(auto.id);
+                          }}
+                          className="block w-full px-3 py-2 text-left text-sm text-error hover:bg-surface-hover"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
+
+      {/* Reel lightbox */}
+      {playingVideo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setPlayingVideo(null)}
+        >
+          <div
+            className="relative flex max-w-full flex-col items-end gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-4 text-sm">
+              {playingVideo.postUrl && (
+                <a
+                  href={playingVideo.postUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-zinc-300 hover:text-white"
+                >
+                  Open on Instagram
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => setPlayingVideo(null)}
+                className="text-zinc-300 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+            <video
+              src={playingVideo.url}
+              controls
+              autoPlay
+              loop
+              playsInline
+              className="max-h-[80vh] max-w-full rounded-lg"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
