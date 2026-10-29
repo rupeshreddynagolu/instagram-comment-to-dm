@@ -47,7 +47,6 @@ As of May 24, 2026, the known audit exceptions are a `postcss` advisory pulled t
 Never commit:
 
 - `DATABASE_URL`
-- `REDIS_URL`
 - `NEXTAUTH_SECRET`
 - `CRON_SECRET`
 - `ENCRYPTION_KEY`

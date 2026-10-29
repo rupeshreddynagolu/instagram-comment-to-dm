@@ -81,23 +81,9 @@ vi.mock("@/lib/queue/client", () => ({
   getDMQueue: () => ({
     add: mockQueueAdd,
   }),
-  getRedisConnection: vi.fn(),
 }));
 
-vi.mock("bullmq", () => {
-  function MockWorker(_name: string, processor: unknown) {
-    (global as Record<string, unknown>).__dmWorkerProcessor = processor;
-    return {
-      on: vi.fn(),
-      close: vi.fn(),
-    };
-  }
-  return {
-    Worker: MockWorker,
-  };
-});
-
-import { createDMWorker } from "../lib/queue/dm-worker";
+import { processComment } from "../lib/queue/dm-worker";
 
 const usagePeriodStart = new Date("2026-05-01T00:00:00.000Z");
 
@@ -135,8 +121,7 @@ function getProcessor(): (job: {
   id: string;
   attemptsMade: number;
 }) => Promise<void> {
-  createDMWorker();
-  return (global as Record<string, unknown>).__dmWorkerProcessor as (job: {
+  return processComment as unknown as (job: {
     data: typeof mockJobData;
     id: string;
     attemptsMade: number;

@@ -38,7 +38,7 @@ Secondary audiences:
 - Fix production audit and release blockers.
 - Deploy staging web/API on Vercel.
 - Deploy worker on Railway.
-- Connect managed Postgres and Redis.
+- Connect managed MySQL.
 - Configure Resend.
 - Configure Stripe test products and webhooks.
 - Configure Meta test app and webhook.

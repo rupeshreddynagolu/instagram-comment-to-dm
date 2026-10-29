@@ -18,7 +18,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
 
       - name: Install dependencies
@@ -27,7 +27,7 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/instrareply
+          DATABASE_URL: mysql://root:mysql@localhost:3306/campaigncue
 
       - name: Typecheck
         run: npm run typecheck
@@ -41,8 +41,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/instrareply
-          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: mysql://root:mysql@localhost:3306/campaigncue
           NEXTAUTH_URL: http://localhost:3000
           NEXTAUTH_SECRET: test-secret-for-ci-build
           CRON_SECRET: test-secret-for-ci-cron
