@@ -86,7 +86,7 @@ The core remains public so builders can self-host, audit, fork, and contribute.
 - MySQL 8 or MariaDB (the job queue lives here too)
 - Meta Developer App
 - Instagram Business or Creator account
-- Resend account for magic-link email
+- Resend account, or your own SMTP server, for magic-link email
 - Stripe account for subscriptions
 
 ### Install
@@ -116,7 +116,7 @@ Fill in all required values:
 - `NEXTAUTH_SECRET`
 - `CRON_SECRET`
 - `ENCRYPTION_KEY`
-- `RESEND_API_KEY`
+- `RESEND_API_KEY` (or `EMAIL_SERVER`, an SMTP URL such as `smtps://user%40example.com:password@mail.example.com:465`, to use your own mail server instead of Resend)
 - `EMAIL_FROM`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`

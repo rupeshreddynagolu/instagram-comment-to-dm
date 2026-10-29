@@ -19,7 +19,7 @@ Copy `.env.example` and set every value in Vercel and Railway:
 - `NEXTAUTH_SECRET`
 - `CRON_SECRET`
 - `ENCRYPTION_KEY`
-- `RESEND_API_KEY`
+- `RESEND_API_KEY` (or `EMAIL_SERVER` to send login emails through your own SMTP server)
 - `EMAIL_FROM`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
