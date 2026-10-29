@@ -12,6 +12,7 @@ const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/campaigns": "Campaigns",
   "/campaigns/new": "New Campaign",
+  "/campaigns/import": "Import Campaigns",
   "/automations": "Campaigns",
   "/automations/new": "New Campaign",
   "/logs": "DM Logs",
@@ -31,7 +32,13 @@ export default function TopBar({
   instagramAccountCount,
 }: TopBarProps) {
   const pathname = usePathname();
-  const title = pageTitles[pathname] ?? "Dashboard";
+  const title =
+    pageTitles[pathname] ??
+    (pathname.endsWith("/edit")
+      ? "Edit Campaign"
+      : pathname.startsWith("/campaigns/")
+        ? "Campaign"
+        : "Dashboard");
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 lg:px-8 border-b border-border glass">

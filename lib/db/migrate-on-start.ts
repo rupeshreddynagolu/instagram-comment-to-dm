@@ -18,13 +18,14 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import mariadb from "mariadb";
+import { repairStorageEngine, type RepairResult } from "./repair-storage-engine";
 
 // Prisma's advisory lock name for migrations on MySQL, so this and the CLI
 // never apply migrations against the same database at once.
 const MIGRATION_LOCK = "prisma_migrate";
 const LOCK_TIMEOUT_SECONDS = 60;
 
-export interface MigrationResult {
+export interface MigrationResult extends RepairResult {
   applied: string[];
 }
 
@@ -92,6 +93,10 @@ export async function applyPendingMigrations(
       );
     }
 
+    // Hosts that default to MyISAM would create every new table without
+    // transactions or foreign keys; make this session's tables InnoDB.
+    await conn.query("SET SESSION default_storage_engine=InnoDB");
+
     // Same definition Prisma creates on MySQL.
     await conn.query(`
       CREATE TABLE IF NOT EXISTS _prisma_migrations (
@@ -150,7 +155,11 @@ export async function applyPendingMigrations(
       applied.push(migration.name);
     }
 
-    return { applied };
+    // Tables an earlier start created on MyISAM, and the foreign keys MyISAM
+    // dropped, are fixed here under the same lock.
+    const repair = await repairStorageEngine(conn, dir);
+
+    return { applied, ...repair };
   } finally {
     await conn.query("SELECT RELEASE_LOCK(?)", [MIGRATION_LOCK]).catch(() => {});
     await conn.end();

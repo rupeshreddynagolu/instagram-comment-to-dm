@@ -3,6 +3,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const {
   mockPrisma,
   mockSendPrivateReply,
+  mockSendPrivateReplyWithLinkButton,
+  mockSendPrivateReplyWithButton,
+  mockGetUserFollowStatus,
+  mockSendDirectMessageWithButton,
+  mockSendDirectMessage,
+  mockSendDirectMessageWithLinkButton,
   mockDecryptToken,
   mockMatchKeywords,
   mockReserveDMSlot,
@@ -13,11 +19,14 @@ const {
   mockPrisma: {
     automation: {
       findMany: vi.fn(),
+      findFirst: vi.fn(),
     },
     dmLog: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       upsert: vi.fn(),
       update: vi.fn(),
+      create: vi.fn(),
     },
     instagramAccount: {
       findUnique: vi.fn(),
@@ -27,6 +36,12 @@ const {
     },
   },
   mockSendPrivateReply: vi.fn(),
+  mockSendPrivateReplyWithLinkButton: vi.fn(),
+  mockSendPrivateReplyWithButton: vi.fn(),
+  mockGetUserFollowStatus: vi.fn(),
+  mockSendDirectMessageWithButton: vi.fn(),
+  mockSendDirectMessage: vi.fn(),
+  mockSendDirectMessageWithLinkButton: vi.fn(),
   mockDecryptToken: vi.fn(),
   mockMatchKeywords: vi.fn(),
   mockReserveDMSlot: vi.fn(),
@@ -41,6 +56,13 @@ vi.mock("@/lib/db/client", () => ({
 
 vi.mock("@/lib/meta/client", () => ({
   sendPrivateReply: mockSendPrivateReply,
+  sendPrivateReplyWithLinkButton: mockSendPrivateReplyWithLinkButton,
+  sendPrivateReplyWithButton: mockSendPrivateReplyWithButton,
+  getUserFollowStatus: mockGetUserFollowStatus,
+  sendDirectMessageWithButton: mockSendDirectMessageWithButton,
+  sendDirectMessage: mockSendDirectMessage,
+  sendDirectMessageWithLinkButton: mockSendDirectMessageWithLinkButton,
+  sendCommentReply: vi.fn(),
   MetaApiError: class MetaApiError extends Error {
     code: number;
     constructor(
@@ -53,6 +75,12 @@ vi.mock("@/lib/meta/client", () => ({
       this.code = code;
       this.name = "MetaApiError";
     }
+  },
+  TokenExpiredError: class TokenExpiredError extends Error {
+    name = "TokenExpiredError";
+  },
+  RateLimitError: class RateLimitError extends Error {
+    name = "RateLimitError";
   },
 }));
 
@@ -81,9 +109,13 @@ vi.mock("@/lib/queue/client", () => ({
   getDMQueue: () => ({
     add: mockQueueAdd,
   }),
+  POSTBACK_JOB_NAME: "process-postback",
+  FOLLOWUP_JOB_NAME: "process-followup",
+  MESSAGE_JOB_NAME: "process-message",
 }));
 
-import { processComment } from "../lib/queue/dm-worker";
+import { processJob } from "../lib/queue/dm-worker";
+import { DEFAULT_FOLLOW_UP } from "../lib/campaigns/defaults";
 
 const usagePeriodStart = new Date("2026-05-01T00:00:00.000Z");
 
@@ -96,6 +128,15 @@ const mockAutomation = {
   dmMessage: "Hey {username}! Here is the link: https://example.com",
   isActive: true,
   wholeWordMatch: true,
+  matchAnyPost: false,
+  matchAnyWord: false,
+  openingDmEnabled: false,
+  openingDmMessage: null,
+  openingDmButtonLabel: null,
+  linkButtonLabel: null,
+  publicReplyEnabled: false,
+  publicReplyMessage: null,
+  publicReplyMessages: [],
   instagramAccount: {
     id: "ig_account_row_1",
     instagramId: "ig_456",
@@ -117,21 +158,38 @@ const mockJobData = {
 };
 
 function getProcessor(): (job: {
-  data: typeof mockJobData;
+  name?: string;
+  data: typeof mockJobData | Record<string, unknown>;
   id: string;
   attemptsMade: number;
 }) => Promise<void> {
-  return processComment as unknown as (job: {
-    data: typeof mockJobData;
+  return processJob as unknown as (job: {
+    name?: string;
+    data: typeof mockJobData | Record<string, unknown>;
     id: string;
     attemptsMade: number;
   }) => Promise<void>;
 }
 
-function createMockJob(data = mockJobData) {
+function createMockJob(data: Record<string, unknown> = mockJobData) {
   return {
     data,
     id: "job_001",
+    attemptsMade: 0,
+  };
+}
+
+function createMockPostbackJob(
+  data: Record<string, unknown> = {
+    instagramAccountId: "ig_456",
+    userId: "commenter_999",
+    payload: "reveal:auto_789",
+  }
+) {
+  return {
+    name: "process-postback",
+    data,
+    id: "postback_job_001",
     attemptsMade: 0,
   };
 }
@@ -140,7 +198,17 @@ beforeEach(() => {
   vi.clearAllMocks();
 
   mockPrisma.automation.findMany.mockResolvedValue([mockAutomation]);
+  mockPrisma.automation.findFirst.mockResolvedValue(null);
   mockPrisma.dmLog.findUnique.mockResolvedValue(null);
+  mockPrisma.dmLog.create.mockResolvedValue({});
+  // Two different lookups share findFirst: the cross-campaign private-reply
+  // check (keyed on status SENT) and the postback's name lookup. Only the
+  // latter should resolve by default, or every comment would look like a
+  // duplicate of an already-answered one.
+  mockPrisma.dmLog.findFirst.mockImplementation(
+    async (args: { where?: { status?: string } } = {}) =>
+      args.where?.status === "SENT" ? null : { commenterName: "commenter_user" }
+  );
   mockPrisma.dmLog.upsert.mockResolvedValue({});
   mockPrisma.dmLog.update.mockResolvedValue({});
   mockPrisma.instagramAccount.findUnique.mockResolvedValue({
@@ -170,6 +238,57 @@ beforeEach(() => {
     recipient_id: "commenter_999",
     message_id: "msg_001",
   });
+  mockSendPrivateReplyWithLinkButton.mockResolvedValue({
+    recipient_id: "commenter_999",
+    message_id: "msg_002",
+  });
+  mockSendPrivateReplyWithButton.mockResolvedValue({
+    recipient_id: "commenter_999",
+    message_id: "msg_003",
+  });
+  mockSendDirectMessageWithButton.mockResolvedValue({
+    recipient_id: "commenter_999",
+    message_id: "msg_004",
+  });
+  mockSendDirectMessage.mockResolvedValue({
+    recipient_id: "commenter_999",
+    message_id: "msg_005",
+  });
+  mockSendDirectMessageWithLinkButton.mockResolvedValue({
+    recipient_id: "commenter_999",
+    message_id: "msg_006",
+  });
+  mockGetUserFollowStatus.mockResolvedValue(true);
+});
+
+describe("DM Worker — comments left on an ad", () => {
+  it("also matches the organic post the ad was created from", async () => {
+    const processor = getProcessor();
+
+    // A boosted post: the comment carries the ad's media id, while the
+    // campaign is bound to the post the ad was made from. Without the second
+    // id in the query the comment matches nothing and is dropped silently.
+    await processor(
+      createMockJob({
+        ...mockJobData,
+        mediaId: "ad_media_999",
+        originalMediaId: "media_101",
+      })
+    );
+
+    expect(mockPrisma.automation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [
+            { postId: "ad_media_999" },
+            { postId: "media_101" },
+            { matchAnyPost: true },
+          ],
+        }),
+      })
+    );
+    expect(mockSendPrivateReply).toHaveBeenCalled();
+  });
 });
 
 describe("DM Worker — Full Pipeline", () => {
@@ -180,7 +299,7 @@ describe("DM Worker — Full Pipeline", () => {
 
     expect(mockPrisma.automation.findMany).toHaveBeenCalledWith({
       where: {
-        postId: "media_101",
+        OR: [{ postId: "media_101" }, { matchAnyPost: true }],
         isActive: true,
         instagramAccount: { instagramId: "ig_456" },
       },
@@ -190,6 +309,7 @@ describe("DM Worker — Full Pipeline", () => {
         trackedLinks: {
           select: {
             slug: true,
+            label: true,
             destinationUrl: true,
           },
           orderBy: { createdAt: "asc" },
@@ -304,7 +424,7 @@ describe("DM Worker — Full Pipeline", () => {
       }),
       expect.objectContaining({
         delay: 1800000,
-        jobId: "comment:ig_456:comment_555:retry:1",
+        jobId: "comment_ig_456_comment_555_retry_1",
       })
     );
   });
@@ -406,14 +526,56 @@ describe("DM Worker — Full Pipeline", () => {
     );
   });
 
-  it("should render tracked links into private replies", async () => {
+  it("should deliver tracked links as web_url buttons (one or two)", async () => {
     mockPrisma.automation.findMany.mockResolvedValue([
       {
         ...mockAutomation,
         dmMessage: "Hey {username}! Here is the offer: {link}",
+        linkButtonLabel: "Get offer",
         trackedLinks: [
           {
             slug: "abc123",
+            label: "Primary campaign link",
+            destinationUrl: "https://example.com",
+          },
+          {
+            slug: "def456",
+            label: "Book a call",
+            destinationUrl: "https://example.com/book",
+          },
+        ],
+      },
+    ]);
+
+    const processor = getProcessor();
+    await processor(createMockJob());
+
+    // Primary button title comes from linkButtonLabel; the second from its
+    // own stored label. Both point at their tracked /r/<slug> URLs.
+    expect(mockSendPrivateReplyWithLinkButton).toHaveBeenCalledWith(
+      "decrypted_token",
+      "ig_456",
+      "comment_555",
+      "Hey commenter_user! Here is the offer:",
+      [
+        { title: "Get offer", url: "http://localhost:3000/r/abc123" },
+        { title: "Book a call", url: "http://localhost:3000/r/def456" },
+      ]
+    );
+  });
+
+  it("should send a follow-gate prompt when a non-follower comments", async () => {
+    mockGetUserFollowStatus.mockResolvedValue(false); // not following yet
+    mockPrisma.automation.findMany.mockResolvedValue([
+      {
+        ...mockAutomation,
+        requireFollow: true,
+        followPromptMessage: "Follow me first {username}, then tap 👇",
+        followPromptButtonLabel: "I'm following ✅",
+        trackedLinks: [
+          {
+            slug: "abc123",
+            label: "Primary campaign link",
             destinationUrl: "https://example.com",
           },
         ],
@@ -423,11 +585,670 @@ describe("DM Worker — Full Pipeline", () => {
     const processor = getProcessor();
     await processor(createMockJob());
 
-    expect(mockSendPrivateReply).toHaveBeenCalledWith(
+    // The follow prompt goes out with a `followcheck:` postback button; the
+    // link is NOT delivered yet.
+    expect(mockSendPrivateReplyWithButton).toHaveBeenCalledWith(
       "decrypted_token",
       "ig_456",
       "comment_555",
-      "Hey commenter_user! Here is the offer: http://localhost:3000/r/abc123"
+      "Follow me first commenter_user, then tap 👇",
+      "I'm following ✅",
+      "followcheck:auto_789"
+    );
+    expect(mockSendPrivateReplyWithLinkButton).not.toHaveBeenCalled();
+    expect(mockSendPrivateReply).not.toHaveBeenCalled();
+  });
+
+  it("should skip the prompt and send the link when the commenter already follows", async () => {
+    mockGetUserFollowStatus.mockResolvedValue(true); // already following
+    mockPrisma.automation.findMany.mockResolvedValue([
+      {
+        ...mockAutomation,
+        requireFollow: true,
+        followPromptMessage: "Follow me first, then tap 👇",
+        followPromptButtonLabel: "I'm following ✅",
+        dmMessage: "Hey {username}! Here is the offer: {link}",
+        linkButtonLabel: "Get offer",
+        trackedLinks: [
+          {
+            slug: "abc123",
+            label: "Primary campaign link",
+            destinationUrl: "https://example.com",
+          },
+        ],
+      },
+    ]);
+
+    const processor = getProcessor();
+    await processor(createMockJob());
+
+    // Confirmed follower: no prompt, link delivered right away.
+    expect(mockSendPrivateReplyWithButton).not.toHaveBeenCalled();
+    expect(mockSendPrivateReplyWithLinkButton).toHaveBeenCalledWith(
+      "decrypted_token",
+      "ig_456",
+      "comment_555",
+      "Hey commenter_user! Here is the offer:",
+      [{ title: "Get offer", url: "http://localhost:3000/r/abc123" }]
+    );
+  });
+
+  it("should send the opening DM first (routing to the follow check) when both opening DM and follow-gate are on", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([
+      {
+        ...mockAutomation,
+        openingDmEnabled: true,
+        openingDmMessage: "Hey {username}, welcome!",
+        openingDmButtonLabel: "Get the link",
+        requireFollow: true,
+        followPromptButtonLabel: "I'm following ✅",
+        trackedLinks: [
+          {
+            slug: "abc123",
+            label: "Primary campaign link",
+            destinationUrl: "https://example.com",
+          },
+        ],
+      },
+    ]);
+
+    const processor = getProcessor();
+    await processor(createMockJob());
+
+    // Opening DM goes out first; its button routes into the follow check.
+    expect(mockSendPrivateReplyWithButton).toHaveBeenCalledWith(
+      "decrypted_token",
+      "ig_456",
+      "comment_555",
+      "Hey commenter_user, welcome!",
+      "Get the link",
+      "followcheck:auto_789"
+    );
+    // Follow status is verified on the tap, not at comment time.
+    expect(mockGetUserFollowStatus).not.toHaveBeenCalled();
+    expect(mockSendPrivateReplyWithLinkButton).not.toHaveBeenCalled();
+  });
+
+  it("should deliver the next DM from a read fallback when no button tap has sent it yet", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([]);
+    mockPrisma.automation.findFirst.mockResolvedValue({
+      ...mockAutomation,
+      trackedLinks: [],
+    });
+
+    const processor = getProcessor();
+    await processor(
+      createMockPostbackJob({
+        instagramAccountId: "ig_456",
+        userId: "commenter_999",
+        payload: "reveal:auto_789",
+        fallback: true,
+      })
+    );
+
+    expect(mockPrisma.dmLog.findUnique).toHaveBeenCalledWith({
+      where: {
+        automationId_commentId: {
+          automationId: "auto_789",
+          commentId: "reveal:commenter_999",
+        },
+      },
+    });
+    expect(mockSendDirectMessage).toHaveBeenCalledWith(
+      "decrypted_token",
+      "ig_456",
+      "commenter_999",
+      "Hey commenter_user! Here is the link: https://example.com"
+    );
+  });
+
+  it("should not deliver a read fallback when the button tap already sent the reveal", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([]);
+    mockPrisma.automation.findFirst.mockResolvedValue({
+      ...mockAutomation,
+      trackedLinks: [],
+    });
+    mockPrisma.dmLog.findUnique.mockResolvedValue({
+      id: "existing_reveal",
+      status: "SENT",
+    });
+
+    const processor = getProcessor();
+    await processor(
+      createMockPostbackJob({
+        instagramAccountId: "ig_456",
+        userId: "commenter_999",
+        payload: "reveal:auto_789",
+        fallback: true,
+      })
+    );
+
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+  });
+
+  it("should not let a read fallback bypass the follow gate", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([]);
+    mockPrisma.automation.findFirst.mockResolvedValue({
+      ...mockAutomation,
+      requireFollow: true,
+      trackedLinks: [],
+    });
+    mockGetUserFollowStatus.mockResolvedValue(false); // still not following
+
+    const processor = getProcessor();
+    await processor(
+      createMockPostbackJob({
+        instagramAccountId: "ig_456",
+        userId: "commenter_999",
+        payload: "reveal:auto_789",
+        fallback: true,
+      })
+    );
+
+    // Non-follower on a read fallback: no link, and no re-prompt spam either.
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockSendDirectMessageWithButton).not.toHaveBeenCalled();
+    expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+  });
+
+  it("should deliver a follow-gated read fallback once the user follows", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([]);
+    mockPrisma.automation.findFirst.mockResolvedValue({
+      ...mockAutomation,
+      requireFollow: true,
+      trackedLinks: [],
+    });
+    mockGetUserFollowStatus.mockResolvedValue(true);
+
+    const processor = getProcessor();
+    await processor(
+      createMockPostbackJob({
+        instagramAccountId: "ig_456",
+        userId: "commenter_999",
+        payload: "reveal:auto_789",
+        fallback: true,
+      })
+    );
+
+    expect(mockSendDirectMessage).toHaveBeenCalledWith(
+      "decrypted_token",
+      "ig_456",
+      "commenter_999",
+      "Hey commenter_user! Here is the link: https://example.com"
+    );
+  });
+
+  it("should not log a failure when a read fallback hits a closed messaging window", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([]);
+    mockPrisma.automation.findFirst.mockResolvedValue({
+      ...mockAutomation,
+      trackedLinks: [],
+    });
+    mockSendDirectMessage.mockRejectedValue(
+      new Error("This message is sent outside of allowed window.")
+    );
+
+    const processor = getProcessor();
+    // The window cannot reopen on its own, so this must not throw (no retries)
+    // and must not leave a FAILED row the user can do nothing about.
+    await expect(
+      processor(
+        createMockPostbackJob({
+          instagramAccountId: "ig_456",
+          userId: "commenter_999",
+          payload: "reveal:auto_789",
+          fallback: true,
+        })
+      )
+    ).resolves.toBeUndefined();
+
+    expect(mockPrisma.dmLog.upsert).not.toHaveBeenCalled();
+    expect(mockReleaseWorkspaceDMReservation).toHaveBeenCalled();
+  });
+
+  it("should still log a failure for a real button tap that fails", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([]);
+    mockPrisma.automation.findFirst.mockResolvedValue({
+      ...mockAutomation,
+      trackedLinks: [],
+    });
+    mockSendDirectMessage.mockRejectedValue(new Error("boom"));
+
+    const processor = getProcessor();
+    await expect(
+      processor(
+        createMockPostbackJob({
+          instagramAccountId: "ig_456",
+          userId: "commenter_999",
+          payload: "reveal:auto_789",
+        })
+      )
+    ).rejects.toThrow("boom");
+
+    expect(mockPrisma.dmLog.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ status: "FAILED" }),
+      })
+    );
+  });
+});
+
+describe("DM Worker — one private reply per comment", () => {
+  it("should skip a campaign when another already used the comment's private reply", async () => {
+    mockPrisma.dmLog.findFirst.mockImplementation(
+      async (args: { where?: { status?: string } } = {}) =>
+        args.where?.status === "SENT"
+          ? { automation: { name: "openreply 1" } }
+          : { commenterName: "commenter_user" }
+    );
+
+    const processor = getProcessor();
+    await processor(createMockJob());
+
+    expect(mockSendPrivateReply).not.toHaveBeenCalled();
+    expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+    expect(mockPrisma.dmLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "SKIPPED_DEDUP",
+          errorMessage: expect.stringContaining("openreply 1"),
+        }),
+      })
+    );
+  });
+
+  it("should not fall back to a plain-text private reply when the window is the problem", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([
+      {
+        ...mockAutomation,
+        trackedLinks: [
+          { slug: "abc123", label: null, destinationUrl: "https://example.com" },
+        ],
+      },
+    ]);
+    mockSendPrivateReplyWithLinkButton.mockRejectedValue(
+      new Error("The comment is invalid for a private reply")
+    );
+
+    const processor = getProcessor();
+    await expect(processor(createMockJob())).rejects.toThrow(
+      "The comment is invalid for a private reply"
+    );
+
+    // A text retry on the same comment would fail identically and overwrite the
+    // real reason, so it must not be attempted.
+    expect(mockSendPrivateReply).not.toHaveBeenCalled();
+    expect(mockPrisma.dmLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "FAILED",
+          errorMessage: "The comment is invalid for a private reply",
+        }),
+      })
+    );
+  });
+
+  it("should still fall back to plain text when the button template itself is rejected", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([
+      {
+        ...mockAutomation,
+        trackedLinks: [
+          { slug: "abc123", label: null, destinationUrl: "https://example.com" },
+        ],
+      },
+    ]);
+    mockSendPrivateReplyWithLinkButton.mockRejectedValue(
+      new Error("Unsupported message template")
+    );
+
+    const processor = getProcessor();
+    await processor(createMockJob());
+
+    expect(mockSendPrivateReply).toHaveBeenCalled();
+    expect(mockPrisma.dmLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "SENT" }),
+      })
+    );
+  });
+});
+
+describe("DM Worker — DM keyword trigger", () => {
+  const dmTriggerAutomation = {
+    ...mockAutomation,
+    dmTriggerEnabled: true,
+    requireFollow: false,
+    followPromptMessage: null,
+    followPromptButtonLabel: null,
+  };
+
+  function createMockMessageJob(data: Record<string, unknown> = {}) {
+    return {
+      name: "process-message",
+      data: {
+        instagramAccountId: "ig_456",
+        messageId: "mid_abc",
+        messageText: "can I get the LINK?",
+        senderId: "commenter_999",
+        ...data,
+      },
+      id: "message_job_001",
+      attemptsMade: 0,
+    };
+  }
+
+  beforeEach(() => {
+    mockPrisma.automation.findMany.mockResolvedValue([dmTriggerAutomation]);
+  });
+
+  it("should reply to a DM whose text matches the campaign keywords", async () => {
+    const processor = getProcessor();
+    await processor(createMockMessageJob());
+
+    expect(mockPrisma.automation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          dmTriggerEnabled: true,
+          isActive: true,
+        }),
+      })
+    );
+    expect(mockSendDirectMessage).toHaveBeenCalledWith(
+      "decrypted_token",
+      "ig_456",
+      "commenter_999",
+      "Hey commenter_user! Here is the link: https://example.com"
+    );
+    // Never a private reply — there is no comment to reply to.
+    expect(mockSendPrivateReply).not.toHaveBeenCalled();
+  });
+
+  it("should not reply when the DM text matches no keyword", async () => {
+    mockMatchKeywords.mockReturnValue({ matched: false, matchedKeyword: null });
+
+    const processor = getProcessor();
+    await processor(createMockMessageJob({ messageText: "hello there" }));
+
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockSendDirectMessageWithLinkButton).not.toHaveBeenCalled();
+  });
+
+  it("should log the reply against the inbound message id for dedup", async () => {
+    const processor = getProcessor();
+    await processor(createMockMessageJob());
+
+    expect(mockPrisma.dmLog.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          automationId_commentId: {
+            automationId: "auto_789",
+            commentId: "dm:mid_abc",
+          },
+        },
+        create: expect.objectContaining({
+          commenterId: "commenter_999",
+          commentText: "can I get the LINK?",
+          matchedKeyword: "LINK",
+          status: "SENT",
+        }),
+      })
+    );
+  });
+
+  it("should not re-send when this message was already answered", async () => {
+    mockPrisma.dmLog.findUnique.mockResolvedValue({ status: "SENT" });
+
+    const processor = getProcessor();
+    await processor(createMockMessageJob());
+
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+  });
+
+  it("should send the link as buttons when the campaign has tracked links", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([
+      {
+        ...dmTriggerAutomation,
+        linkButtonLabel: "Get it",
+        trackedLinks: [
+          {
+            slug: "abc123",
+            label: "Get it",
+            destinationUrl: "https://example.com/offer",
+          },
+        ],
+      },
+    ]);
+
+    const processor = getProcessor();
+    await processor(createMockMessageJob());
+
+    expect(mockSendDirectMessageWithLinkButton).toHaveBeenCalled();
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+  });
+
+  it("should send the follow prompt instead of the link to a non-follower", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([
+      { ...dmTriggerAutomation, requireFollow: true },
+    ]);
+    mockGetUserFollowStatus.mockResolvedValue(false);
+
+    const processor = getProcessor();
+    await processor(createMockMessageJob());
+
+    expect(mockSendDirectMessageWithButton).toHaveBeenCalledWith(
+      "decrypted_token",
+      "ig_456",
+      "commenter_999",
+      expect.any(String),
+      "I'm following ✅",
+      "followcheck:auto_789"
+    );
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+  });
+
+  // First contact, so the gate is fail-closed like processComment: an
+  // unverifiable status must not hand out the link.
+  it("should send the follow prompt when follow status cannot be verified", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([
+      { ...dmTriggerAutomation, requireFollow: true },
+    ]);
+    mockGetUserFollowStatus.mockResolvedValue(null);
+
+    const processor = getProcessor();
+    await processor(createMockMessageJob());
+
+    expect(mockSendDirectMessageWithButton).toHaveBeenCalled();
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+  });
+
+  it("should skip and log when the workspace is over its monthly limit", async () => {
+    mockReserveWorkspaceDMSend.mockResolvedValue({
+      allowed: false,
+      reserved: false,
+      remaining: 0,
+      limit: 2000,
+      periodStart: usagePeriodStart,
+    });
+
+    const processor = getProcessor();
+    await processor(createMockMessageJob());
+
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockPrisma.dmLog.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ status: "SKIPPED_PLAN_LIMIT" }),
+      })
+    );
+  });
+
+  it("should release the usage reservation and rethrow when the send fails", async () => {
+    mockSendDirectMessage.mockRejectedValue(new Error("Meta is down"));
+
+    const processor = getProcessor();
+    await expect(processor(createMockMessageJob())).rejects.toThrow(
+      "Meta is down"
+    );
+
+    expect(mockReleaseWorkspaceDMReservation).toHaveBeenCalledWith(
+      "workspace_123",
+      usagePeriodStart
+    );
+    expect(mockPrisma.dmLog.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ status: "FAILED" }),
+      })
+    );
+  });
+});
+
+describe("DM Worker — ReplyNxt guarantees", () => {
+  it("sends a campaign created before the builder one plain DM and nothing else", async () => {
+    // Every new option off, exactly as the migration leaves an old campaign.
+    mockPrisma.automation.findMany.mockResolvedValue([
+      {
+        ...mockAutomation,
+        requireFollow: false,
+        followUpEnabled: false,
+        followUpMessage: null,
+        dmTriggerEnabled: false,
+      },
+    ]);
+
+    await getProcessor()(createMockJob());
+
+    expect(mockSendPrivateReply).toHaveBeenCalledTimes(1);
+    expect(mockSendPrivateReplyWithButton).not.toHaveBeenCalled();
+    expect(mockSendPrivateReplyWithLinkButton).not.toHaveBeenCalled();
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+  });
+
+  it("does not reveal the link from a button tap once the monthly cap is reached", async () => {
+    mockPrisma.automation.findFirst.mockResolvedValue({
+      ...mockAutomation,
+      openingDmEnabled: true,
+      requireFollow: false,
+    });
+    mockReserveWorkspaceDMSend.mockResolvedValue({
+      allowed: false,
+      reserved: false,
+      remaining: 0,
+      limit: 100,
+      periodStart: usagePeriodStart,
+    });
+
+    await getProcessor()(createMockPostbackJob());
+
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockSendDirectMessageWithLinkButton).not.toHaveBeenCalled();
+    expect(mockPrisma.dmLog.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          status: "SKIPPED_PLAN_LIMIT",
+          errorMessage: "Monthly DM limit reached (100)",
+        }),
+      })
+    );
+  });
+});
+
+describe("DM Worker — quota protection", () => {
+  it("does not re-send or charge for a repeat button tap after the link was delivered", async () => {
+    mockPrisma.automation.findFirst.mockResolvedValue({
+      ...mockAutomation,
+      openingDmEnabled: true,
+      requireFollow: false,
+    });
+    mockPrisma.dmLog.findUnique.mockResolvedValue({ status: "SENT" });
+
+    await getProcessor()(createMockPostbackJob());
+
+    expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockSendDirectMessageWithLinkButton).not.toHaveBeenCalled();
+  });
+
+  it("replies to the same DM sender at most once a day per campaign", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([
+      { ...mockAutomation, dmTriggerEnabled: true, requireFollow: false },
+    ]);
+    // A reply already went to this sender for this campaign today.
+    mockPrisma.dmLog.findFirst.mockImplementation(
+      async (args: { where?: { status?: string } } = {}) =>
+        args.where?.status === "SENT" ? { id: "log_earlier" } : null
+    );
+
+    await getProcessor()({
+      name: "process-message",
+      data: {
+        instagramAccountId: "ig_456",
+        messageId: "mid_second",
+        messageText: "LINK please",
+        senderId: "commenter_999",
+      },
+      id: "message_job_002",
+      attemptsMade: 0,
+    });
+
+    expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockPrisma.dmLog.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          automationId: "auto_789",
+          commenterId: "commenter_999",
+          status: "SENT",
+          commentId: { startsWith: "dm:" },
+        }),
+      })
+    );
+  });
+});
+
+describe("DM Worker — follow-up thank-you", () => {
+  const followUpCampaign = {
+    ...mockAutomation,
+    requireFollow: false,
+    followUpEnabled: true,
+    // Left blank in the builder, which previews the default message.
+    followUpMessage: "",
+    followUpDelayMinutes: 1,
+  };
+
+  it("schedules the follow-up after a reveal even when its message was left blank", async () => {
+    mockPrisma.automation.findFirst.mockResolvedValue(followUpCampaign);
+
+    await getProcessor()(createMockPostbackJob());
+
+    expect(mockQueueAdd).toHaveBeenCalledWith(
+      "process-followup",
+      expect.objectContaining({ userId: "commenter_999", automationId: "auto_789" }),
+      expect.objectContaining({ delay: 60_000 })
+    );
+  });
+
+  it("sends the default thank-you when the follow-up message is blank", async () => {
+    mockPrisma.automation.findFirst.mockResolvedValue(followUpCampaign);
+
+    await getProcessor()({
+      name: "process-followup",
+      data: {
+        instagramAccountId: "ig_456",
+        userId: "commenter_999",
+        automationId: "auto_789",
+        commenterName: "commenter_user",
+      },
+      id: "followup_job_001",
+      attemptsMade: 0,
+    });
+
+    expect(mockSendDirectMessage).toHaveBeenCalledWith(
+      "decrypted_token",
+      "ig_456",
+      "commenter_999",
+      DEFAULT_FOLLOW_UP
     );
   });
 });

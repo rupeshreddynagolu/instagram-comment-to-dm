@@ -1,14 +1,15 @@
 /**
- * DmJob — the Sidequest job class behind the DM queue.
+ * DmJob — the single Sidequest job class behind the DM queue.
  *
- * Arguments are (name, data, key): the name is kept so call sites read like
- * the BullMQ queue they replaced (add("process-comment", ...)), and the key is
- * the deterministic job id, so duplicate enqueues collapse through Sidequest's
- * uniqueness digest and jobs stay readable in the table.
+ * One class carries every DM job type, routed by name like the BullMQ queue
+ * was (process-comment, process-postback, ...), so the processors in
+ * lib/queue/dm-worker.ts are unchanged. Arguments are (name, data, key): the
+ * key is the old deterministic job id, kept so duplicate enqueues collapse
+ * through Sidequest's uniqueness digest and so jobs stay readable in the table.
  */
 
 import { Job } from "sidequest";
-import type { ProcessCommentJob } from "@/lib/queue/client";
+import type { DmQueueJob } from "@/lib/queue/client";
 
 // Retry delays after the 1st and 2nd failed attempt — the same 5/15/45
 // minute ladder the BullMQ worker used. Sidequest's own backoff is only
@@ -18,11 +19,11 @@ export const BACKOFF_DELAYS = [5 * 60 * 1000, 15 * 60 * 1000, 45 * 60 * 1000];
 export const DM_JOB_MAX_ATTEMPTS = 3;
 
 export class DmJob extends Job {
-  async run(name: string, data: ProcessCommentJob, key?: string | null) {
+  async run(name: string, data: DmQueueJob, key?: string | null) {
     // Imported lazily: the queue client builds this class to enqueue, and the
     // worker module imports the queue client — a static import would cycle and
     // pull the whole worker into every route that only enqueues.
-    const { processComment, recordWorkerFailure } = await import(
+    const { processJob, recordWorkerFailure } = await import(
       "@/lib/queue/dm-worker"
     );
     const job = {
@@ -33,7 +34,7 @@ export class DmJob extends Job {
     };
 
     try {
-      await processComment(job);
+      await processJob(job);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       console.error(

@@ -46,7 +46,9 @@ export const authConfig = {
   },
   pages: {
     signIn: "/login",
-    verifyRequest: "/login?checkEmail=1",
+    // Auth.js appends ?provider=...&type=email to this page, so it must not
+    // carry a query string of its own (see lib/login/check-email.ts).
+    verifyRequest: "/login",
   },
   session: {
     strategy: "database",

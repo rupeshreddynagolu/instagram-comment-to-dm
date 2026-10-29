@@ -1,4 +1,5 @@
 import { EMAIL_PROVIDER_ID, signIn } from "@/lib/auth";
+import { isCheckEmailRedirect } from "@/lib/login/check-email";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
 
 export const metadata = {
@@ -11,12 +12,13 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{
     checkEmail?: string;
+    type?: string;
     callbackUrl?: string;
     template?: string;
   }>;
 }) {
   const params = await searchParams;
-  const checkEmail = params.checkEmail === "1";
+  const checkEmail = isCheckEmailRedirect(params);
   const selectedTemplate = getCampaignTemplate(params.template);
   const templateCallbackUrl = selectedTemplate
     ? `/campaigns/new?template=${selectedTemplate.slug}`

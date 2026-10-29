@@ -12,12 +12,19 @@ export async function register() {
   if (process.env.MIGRATE_ON_START === "true") {
     const { applyPendingMigrations } = await import("@/lib/db/migrate-on-start");
     try {
-      const { applied } = await applyPendingMigrations();
+      const { applied, converted, foreignKeysAdded } =
+        await applyPendingMigrations();
       console.log(
         applied.length > 0
           ? `[Migrate] Applied ${applied.length} migration(s): ${applied.join(", ")}`
           : "[Migrate] Database is up to date"
       );
+      if (converted.length > 0) {
+        console.log(`[Migrate] Converted ${converted.length} table(s) to InnoDB`);
+      }
+      if (foreignKeysAdded.length > 0) {
+        console.log(`[Migrate] Added ${foreignKeysAdded.length} foreign key(s)`);
+      }
     } catch (error) {
       // Without its tables the app cannot work, but keep serving so
       // /api/health and the log say why instead of a blank Passenger error.

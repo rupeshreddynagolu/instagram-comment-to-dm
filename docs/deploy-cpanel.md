@@ -126,11 +126,12 @@ a few seconds while Passenger boots the app.
 ## 6. Add the cron jobs
 
 In cPanel, open **Cron Jobs**, set the cron email at the top of the page, and
-add these two, with your domain and your `CRON_SECRET`:
+add these three, with your domain and your `CRON_SECRET`:
 
 ```
-*/5 * * * *  curl -fsS -m 60 https://replynxt.com/api/health > /dev/null
-0 5 * * *    curl -fsS -m 180 -H "Authorization: Bearer YOUR_CRON_SECRET" https://replynxt.com/api/cron/refresh-tokens > /dev/null
+*/5 * * * *   curl -fsS -m 60 https://replynxt.com/api/health > /dev/null
+0 5 * * *     curl -fsS -m 180 -H "Authorization: Bearer YOUR_CRON_SECRET" https://replynxt.com/api/cron/refresh-tokens > /dev/null
+*/10 * * * *  curl -fsS -m 120 -H "Authorization: Bearer YOUR_CRON_SECRET" https://replynxt.com/api/cron/attach-next-reel > /dev/null
 ```
 
 - **Every 5 minutes, `/api/health`**: keeps the app awake. Passenger shuts an
@@ -144,6 +145,10 @@ add these two, with your domain and your `CRON_SECRET`:
   before they expire and resets monthly DM usage. Without it every campaign
   stops without an error once a token expires. It is the job `vercel.json`
   schedules on Vercel.
+- **Every 10 minutes, `/api/cron/attach-next-reel`**: Instagram sends no
+  event when you publish, so this looks for your newest reel and attaches
+  any "next reel" campaign to it. A campaign goes live within ten minutes of
+  the reel being posted.
 
 Successful runs stay quiet; only failures send email.
 
