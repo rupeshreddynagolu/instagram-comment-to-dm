@@ -50,7 +50,7 @@ export default function PrivacyPage() {
         <p className="mt-3">
           The production service may use hosting, database, email, billing,
           and observability providers such as Vercel, Railway, MySQL, Resend,
-          and Stripe. These providers process data
+          Stripe, and Razorpay. These providers process data
           only as needed to run the service.
         </p>
       </section>

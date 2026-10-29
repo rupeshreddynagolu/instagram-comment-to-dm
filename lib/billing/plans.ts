@@ -35,6 +35,13 @@ export function getPlanForPriceId(priceId: string | null | undefined): Plan {
   return "FREE";
 }
 
+export function getPlanForRazorpayPlanId(planId: string | null | undefined): Plan {
+  if (!planId) return "FREE";
+  if (planId === process.env.RAZORPAY_PLAN_AGENCY) return "AGENCY";
+  if (planId === process.env.RAZORPAY_PLAN_PRO) return "PRO";
+  return "FREE";
+}
+
 export function hasPaidAccess(status: SubscriptionStatus): boolean {
   return status === "ACTIVE" || status === "TRIALING";
 }

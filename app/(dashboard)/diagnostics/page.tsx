@@ -30,7 +30,8 @@ interface DiagnosticsData {
   }>;
   billingEvents: Array<{
     id: string;
-    stripeEventId: string;
+    provider: "STRIPE" | "RAZORPAY";
+    eventId: string;
     type: string;
     processedAt: string;
   }>;
@@ -280,7 +281,7 @@ export default function DiagnosticsPage() {
                     {event.type}
                   </p>
                   <p className="mt-1 truncate text-xs text-muted">
-                    {event.stripeEventId} · {formatDate(event.processedAt)}
+                    {event.provider} · {event.eventId} · {formatDate(event.processedAt)}
                   </p>
                 </div>
               ))}

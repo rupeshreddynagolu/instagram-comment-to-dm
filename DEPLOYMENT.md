@@ -84,6 +84,22 @@ Subscribe to:
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
 
+## Razorpay (optional)
+
+Razorpay bills Indian customers in INR, with UPI Autopay and cards. When its variables are unset, Settings only offers Stripe.
+
+1. In the Razorpay dashboard, create two monthly plans in INR (Pro and Agency). Put their IDs into `RAZORPAY_PLAN_PRO` and `RAZORPAY_PLAN_AGENCY`.
+2. Generate API keys and set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`.
+3. Add a webhook pointing to:
+
+```text
+https://your-domain.com/api/razorpay/webhook
+```
+
+Choose a secret, set it as `RAZORPAY_WEBHOOK_SECRET`, and subscribe to every `subscription.*` event.
+
+A workspace pays through one provider at a time. Razorpay has no hosted customer portal, so Razorpay subscribers cancel from Settings; access continues until the paid cycle ends.
+
 ## Meta
 
 Configure the webhook callback URL:

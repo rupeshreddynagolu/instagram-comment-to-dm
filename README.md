@@ -30,6 +30,7 @@ Most tools in this market are broad chatbot platforms. CampaignCue is intentiona
 - Idempotent DM logs per campaign/comment.
 - Atomic monthly usage reservations and MySQL-backed hourly DM reservations.
 - Stripe Checkout, Customer Portal, and subscription webhooks.
+- Razorpay subscriptions for INR billing with UPI Autopay (optional).
 - Plan limits for campaigns and monthly DMs.
 - Vercel cron for token refresh and usage maintenance.
 - Health checks and authenticated production diagnostics.
@@ -121,6 +122,7 @@ Fill in all required values:
 - `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_PRICE_PRO`
 - `STRIPE_PRICE_AGENCY`
+- `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `RAZORPAY_PLAN_PRO`, `RAZORPAY_PLAN_AGENCY` (optional, for INR billing with UPI)
 - `META_GRAPH_API_VERSION`
 - `INSTAGRAM_APP_ID`
 - `INSTAGRAM_APP_SECRET`

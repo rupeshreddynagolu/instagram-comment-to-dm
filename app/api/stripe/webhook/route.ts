@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { requireEnv } from "@/lib/env";
 import { prisma } from "@/lib/db/client";
 import { getPlanForPriceId } from "@/lib/billing/plans";
+import { ownedByOrUnpaid } from "@/lib/billing/providers";
 import { getStripe } from "@/lib/stripe";
 import type { SubscriptionStatus } from "@/app/generated/prisma/client";
 
@@ -46,13 +47,19 @@ async function upsertSubscription(subscription: Stripe.Subscription) {
 
   await prisma.workspace.updateMany({
     where: {
-      OR: [
-        { id: workspaceId || "__missing_workspace__" },
-        { stripeCustomerId: customerId },
-        { stripeSubscriptionId: subscription.id },
+      AND: [
+        {
+          OR: [
+            { id: workspaceId || "__missing_workspace__" },
+            { stripeCustomerId: customerId },
+            { stripeSubscriptionId: subscription.id },
+          ],
+        },
+        ownedByOrUnpaid("STRIPE"),
       ],
     },
     data: {
+      billingProvider: "STRIPE",
       plan,
       subscriptionStatus,
       stripeCustomerId: customerId,
@@ -100,7 +107,7 @@ export async function POST(request: NextRequest) {
   }
 
   const existing = await prisma.billingEvent.findUnique({
-    where: { stripeEventId: event.id },
+    where: { provider_eventId: { provider: "STRIPE", eventId: event.id } },
   });
 
   if (existing) {
@@ -128,7 +135,8 @@ export async function POST(request: NextRequest) {
   await prisma.billingEvent.create({
     data: {
       workspaceId: workspaceId || null,
-      stripeEventId: event.id,
+      provider: "STRIPE",
+      eventId: event.id,
       type: event.type,
       payload: event as unknown as object,
     },
