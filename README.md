@@ -81,7 +81,7 @@ The core remains public so builders can self-host, audit, fork, and contribute.
 
 ### Requirements
 
-- Node.js 20+
+- Node.js 22.12+ or 24+ (Sidequest needs 22.6+, Prisma 7 needs 22.12+)
 - MySQL 8 or MariaDB (the job queue lives here too)
 - Meta Developer App
 - Instagram Business or Creator account
