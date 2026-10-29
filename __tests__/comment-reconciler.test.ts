@@ -95,13 +95,23 @@ describe("reconcileComments", () => {
     );
   });
 
-  it("checks the DM log for SENT so a webhook-handled comment is skipped", async () => {
+  it("skips a comment whose webhook job is still being processed", async () => {
+    // The webhook's job has logged the comment as PENDING but not sent yet.
+    mockPrisma.dmLog.findMany.mockResolvedValue([
+      { commentId: "c_sent" },
+      { commentId: "c_new" },
+    ]);
+
     await reconcileComments();
 
-    expect(mockPrisma.dmLog.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ automationId: "auto_1", status: "SENT" }),
-      })
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+    const { where } = mockPrisma.dmLog.findMany.mock.calls[0][0];
+    expect(where.OR).toEqual(
+      expect.arrayContaining([
+        { status: "SENT" },
+        expect.objectContaining({ status: "PENDING" }),
+        { status: "SKIPPED_PLAN_LIMIT" },
+      ])
     );
   });
 });

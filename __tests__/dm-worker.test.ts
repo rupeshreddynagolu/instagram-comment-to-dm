@@ -1152,3 +1152,56 @@ describe("DM Worker — ReplyNxt guarantees", () => {
     );
   });
 });
+
+describe("DM Worker — quota protection", () => {
+  it("does not re-send or charge for a repeat button tap after the link was delivered", async () => {
+    mockPrisma.automation.findFirst.mockResolvedValue({
+      ...mockAutomation,
+      openingDmEnabled: true,
+      requireFollow: false,
+    });
+    mockPrisma.dmLog.findUnique.mockResolvedValue({ status: "SENT" });
+
+    await getProcessor()(createMockPostbackJob());
+
+    expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockSendDirectMessageWithLinkButton).not.toHaveBeenCalled();
+  });
+
+  it("replies to the same DM sender at most once a day per campaign", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([
+      { ...mockAutomation, dmTriggerEnabled: true, requireFollow: false },
+    ]);
+    // A reply already went to this sender for this campaign today.
+    mockPrisma.dmLog.findFirst.mockImplementation(
+      async (args: { where?: { status?: string } } = {}) =>
+        args.where?.status === "SENT" ? { id: "log_earlier" } : null
+    );
+
+    await getProcessor()({
+      name: "process-message",
+      data: {
+        instagramAccountId: "ig_456",
+        messageId: "mid_second",
+        messageText: "LINK please",
+        senderId: "commenter_999",
+      },
+      id: "message_job_002",
+      attemptsMade: 0,
+    });
+
+    expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockPrisma.dmLog.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          automationId: "auto_789",
+          commenterId: "commenter_999",
+          status: "SENT",
+          commentId: { startsWith: "dm:" },
+        }),
+      })
+    );
+  });
+});

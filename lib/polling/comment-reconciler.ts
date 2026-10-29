@@ -45,6 +45,8 @@ const LOOKBACK_HOURS = Number(process.env.COMMENT_POLL_LOOKBACK_HOURS ?? 72);
 const MAX_NEW_PER_SWEEP = Number(process.env.COMMENT_POLL_MAX_PER_SWEEP ?? 30);
 // For "any post" campaigns, how many recent posts to scan.
 const RECENT_MEDIA_LIMIT = 10;
+// A DmLog row left PENDING for less than this is a job still running.
+const IN_FLIGHT_WINDOW_MS = 15 * 60 * 1000;
 
 interface SweepStat {
   campaign: string;
@@ -211,13 +213,26 @@ async function sweepCampaign(
     // enough — the reply still has to land); otherwise a SENT DM is enough. This
     // is what lets a comment whose DM sent but whose public reply failed come
     // back and retry the reply.
+    //
+    // Also skip a comment a job is working on right now (PENDING, recently
+    // touched), so the poll cannot race the webhook's job into a second DM,
+    // and one already skipped for the plan limit, which the worker would skip
+    // again anyway. A PENDING row older than the window is a job that died
+    // mid-send, and is retried.
     const handled = await prisma.dmLog.findMany({
       where: {
         automationId: automation.id,
         commentId: { in: needsAction.map((c) => c.id) },
-        ...(automation.publicReplyEnabled
-          ? { publicReplySentAt: { not: null } }
-          : { status: "SENT" }),
+        OR: [
+          automation.publicReplyEnabled
+            ? { publicReplySentAt: { not: null } }
+            : { status: "SENT" },
+          {
+            status: "PENDING",
+            updatedAt: { gte: new Date(Date.now() - IN_FLIGHT_WINDOW_MS) },
+          },
+          { status: "SKIPPED_PLAN_LIMIT" },
+        ],
       },
       select: { commentId: true },
     });

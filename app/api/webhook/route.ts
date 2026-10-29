@@ -29,28 +29,37 @@ export async function GET(request: NextRequest) {
   );
 }
 
+// Bad-signature requests are recorded at most once per interval per process.
+const SIGNATURE_FAILURE_LOG_INTERVAL_MS = 10 * 60 * 1000;
+let lastSignatureFailureRecordedAt = 0;
+
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
 
   if (!verifyWebhookSignature(rawBody, signature)) {
-    // Record the attempt so a signature mismatch is visible rather than a
-    // silent 401. This is the common symptom of FACEBOOK_APP_SECRET being
-    // set to the wrong app's secret for the webhook's signing key.
-    await prisma.operationalEvent
-      .create({
-        data: {
-          source: "SYSTEM",
-          level: "WARNING",
-          message: "Webhook signature verification failed",
-          payload: {
-            hadSignatureHeader: Boolean(signature),
-            bodyLength: rawBody.length,
-            bodyPreview: rawBody.slice(0, 200),
+    // Record the failure so a signature mismatch is visible rather than a
+    // silent 401. This is the common symptom of the app secrets not matching
+    // the key Meta signs with. Anyone can send these requests, so record at
+    // most one per interval, and never their body.
+    console.warn("[Webhook] Signature verification failed");
+    const now = Date.now();
+    if (now - lastSignatureFailureRecordedAt >= SIGNATURE_FAILURE_LOG_INTERVAL_MS) {
+      lastSignatureFailureRecordedAt = now;
+      await prisma.operationalEvent
+        .create({
+          data: {
+            source: "SYSTEM",
+            level: "WARNING",
+            message: "Webhook signature verification failed",
+            payload: {
+              hadSignatureHeader: Boolean(signature),
+              bodyLength: rawBody.length,
+            },
           },
-        },
-      })
-      .catch(() => {});
+        })
+        .catch(() => {});
+    }
     return NextResponse.json(
       { success: false, error: "Invalid signature" },
       { status: 401 }

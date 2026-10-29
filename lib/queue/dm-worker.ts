@@ -41,6 +41,10 @@ import {
 
 // A queued job as the processors see it. Mirrors the BullMQ job these were
 // written against; DmJob (lib/jobs/dm-job.ts) builds it from the Sidequest job.
+// How long a DM keyword reply to one sender blocks another for the same
+// campaign.
+const DM_TRIGGER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
 export interface Job<T = DmQueueJob> {
   id: string;
   name: string;
@@ -724,21 +728,20 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
     return;
   }
 
-  // Duplicate sends are enabled: every button tap re-sends the reveal
-  // instead of only firing once per person.
+  // One reveal per person per campaign. The link is already in their chat
+  // after the first one, and every send counts against the workspace's
+  // monthly DMs, so repeat taps must not be able to drain it.
   const dedupeId = `reveal:${userId}`;
 
-  if (fallback) {
-    const existingReveal = await prisma.dmLog.findUnique({
-      where: {
-        automationId_commentId: {
-          automationId: automation.id,
-          commentId: dedupeId,
-        },
+  const existingReveal = await prisma.dmLog.findUnique({
+    where: {
+      automationId_commentId: {
+        automationId: automation.id,
+        commentId: dedupeId,
       },
-    });
-    if (existingReveal?.status === "SENT") return;
-  }
+    },
+  });
+  if (existingReveal?.status === "SENT") return;
 
   // Personalize {username} from the opening DM log for this user, if present.
   const openingLog = await prisma.dmLog.findFirst({
@@ -1002,6 +1005,21 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
     ) {
       continue;
     }
+
+    // One keyword reply per sender per campaign per day. Each reply counts
+    // against the workspace's monthly DMs, so someone repeating the keyword
+    // must not be able to drain them.
+    const recentReply = await prisma.dmLog.findFirst({
+      where: {
+        automationId: automation.id,
+        commenterId: senderId,
+        status: "SENT",
+        commentId: { startsWith: "dm:" },
+        updatedAt: { gte: new Date(Date.now() - DM_TRIGGER_COOLDOWN_MS) },
+      },
+      select: { id: true },
+    });
+    if (recentReply) continue;
 
     const logBase = {
       workspaceId: automation.workspaceId,
