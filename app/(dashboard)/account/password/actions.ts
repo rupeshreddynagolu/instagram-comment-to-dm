@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUserId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
-import { safeCallbackPath } from "@/lib/auth-password/callback";
 import { verifyCurrentPassword } from "@/lib/auth-password/authenticate";
 import { hashPassword, passwordProblem } from "@/lib/auth-password/hash";
 import { mayChangeWithoutCurrentPassword } from "@/lib/auth-password/reauth";
@@ -11,6 +10,8 @@ import { currentSession, endOtherSessions } from "@/lib/auth-password/session";
 
 export interface SetPasswordState {
   error: string | null;
+  /** Set once the password is saved; the form shows a confirmation. */
+  saved?: boolean;
 }
 
 /**
@@ -64,5 +65,7 @@ export async function setPassword(
   // The link's window is used up: a later change needs the new password.
   if (session) await prisma.session.update({ where: { id: session.id }, data: { createdAt: null } });
 
-  redirect(safeCallbackPath(String(formData.get("next") ?? ""), "/dashboard"));
+  // Confirm in place rather than redirecting: a redirect lands somewhere that
+  // says nothing about the change, after the form has already gone blank.
+  return { error: null, saved: true };
 }

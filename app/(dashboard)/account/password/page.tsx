@@ -1,4 +1,3 @@
-import Link from "next/link";
 import SetPasswordForm from "@/components/set-password-form";
 import { getCurrentUserId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
@@ -41,13 +40,7 @@ export default async function PasswordPage({
         <div className="mt-6">
           <SetPasswordForm next={destination} hasPassword={hasPassword} needsCurrent={needsCurrent} />
         </div>
-        {!hasPassword && (
-          <p className="mt-4 text-center text-sm">
-            <Link href={destination} className="text-muted underline-offset-4 hover:text-foreground hover:underline">
-              Skip for now
-            </Link>
-          </p>
-        )}
+
       </section>
     </div>
   );

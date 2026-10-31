@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import Link from "next/link";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { setPassword, type SetPasswordState } from "@/app/(dashboard)/account/password/actions";
 
 const field =
@@ -22,6 +23,40 @@ export default function SetPasswordForm({
   });
   const [shown, setShown] = useState(false);
   const type = shown ? "text" : "password";
+  const confirmation = useRef<HTMLDivElement>(null);
+
+  // Move focus to the confirmation so screen readers announce it.
+  useEffect(() => {
+    if (state.saved) confirmation.current?.focus();
+  }, [state.saved]);
+
+  if (state.saved) {
+    return (
+      <div ref={confirmation} tabIndex={-1} role="status" className="space-y-4 outline-none">
+        <div className="flex items-start gap-3 rounded-xl border border-success/20 bg-success/10 px-4 py-3">
+          <svg className="mt-0.5 h-5 w-5 shrink-0 text-success" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fillRule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.25 7.3a1 1 0 0 1-1.42 0L4.78 10.7a1 1 0 1 1 1.42-1.4l2.54 2.56 6.54-6.6a1 1 0 0 1 1.42.04Z" clipRule="evenodd" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {hasPassword ? "Password changed" : "Password saved"}
+            </p>
+            <p className="mt-0.5 text-sm text-muted">
+              {hasPassword
+                ? "Use it next time you sign in. You've been signed out on your other devices."
+                : "Next time, sign in with your email and this password. Email links keep working too."}
+            </p>
+          </div>
+        </div>
+        <Link
+          href={next}
+          className="flex w-full items-center justify-center rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-site-ink transition-colors hover:bg-accent-hover"
+        >
+          Continue
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <form action={action} className="space-y-4">
@@ -77,6 +112,15 @@ export default function SetPasswordForm({
       >
         {pending ? "Saving…" : hasPassword ? "Change password" : "Save password"}
       </button>
+
+      {/* First time only: a password is optional, email links still work. */}
+      {!hasPassword && (
+        <p className="text-center text-sm">
+          <Link href={next} className="text-muted underline-offset-4 hover:text-foreground hover:underline">
+            Skip for now
+          </Link>
+        </p>
+      )}
     </form>
   );
 }
