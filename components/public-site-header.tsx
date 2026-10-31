@@ -56,10 +56,11 @@ export default function PublicSiteHeader({ active }: PublicSiteHeaderProps) {
         </nav>
 
         <div className="flex items-center gap-1">
-          {/* The bar's one action. Starting free lives on the page itself. */}
+          {/* The bar's one action on desktop. Below that, Sign in is a card in
+              the menu instead. Starting free lives on the page itself. */}
           <Link
             href="/login"
-            className={`${item} border border-white/15 px-4 text-site-paper hover:border-white/30 hover:bg-white/5`}
+            className={`${item} border border-white/15 px-4 text-site-paper hover:border-white/30 hover:bg-white/5 max-lg:hidden`}
           >
             Sign in
           </Link>
