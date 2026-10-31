@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import SiteShell from "@/components/site-shell";
 import CtaButton from "@/components/site/cta-button";
-import TemplateVisual from "@/components/template-visual";
+import TemplateCard from "@/components/templates/template-card";
+import TemplateDeck from "@/components/templates/template-deck";
 import { SectionHeading } from "@/components/site/primitives";
 import Reveal from "@/components/site/reveal";
 import SplitHeadline from "@/components/site/split-headline";
@@ -20,15 +20,11 @@ export const metadata: Metadata = {
   ],
 };
 
-/** "Agents and broker teams" → "agents and broker teams"; "DTC brands" stays. */
-function audienceInSentence(audience: string) {
-  return /^[A-Z][a-z]/.test(audience)
-    ? audience[0].toLowerCase() + audience.slice(1)
-    : audience;
-}
-
 export default function TemplatesPage() {
-  const [featured] = CAMPAIGN_TEMPLATES;
+  // Three different kinds of campaign for the deck in the hero.
+  const deck = ["event-rsvp", "fitness-plan", "dtc-product-link"]
+    .map((slug) => CAMPAIGN_TEMPLATES.find((template) => template.slug === slug))
+    .filter((template) => template !== undefined);
 
   return (
     <SiteShell active="templates">
@@ -60,7 +56,7 @@ export default function TemplatesPage() {
           </Reveal>
         </div>
         <Reveal onLoadDelay={0.55}>
-          <TemplateVisual template={featured} />
+          <TemplateDeck templates={deck} />
         </Reveal>
       </section>
 
@@ -72,43 +68,7 @@ export default function TemplatesPage() {
         <Reveal stagger as="ul" className="mt-12 grid gap-4 md:grid-cols-2">
           {CAMPAIGN_TEMPLATES.map((template) => (
             <li key={template.slug}>
-              <article className="use-card glass group relative flex h-full flex-col rounded-[1.75rem] p-6 sm:p-7">
-                <p className="site-mono text-[12px] text-site-dim">
-                  {template.category}, for {audienceInSentence(template.audience)}
-                </p>
-                <h2 className="mt-3 text-2xl leading-tight">
-                  {/* The title's link covers the card; the button sits above it. */}
-                  <Link
-                    href={`/templates/${template.slug}`}
-                    className="after:absolute after:inset-0 after:rounded-[1.75rem] after:content-['']"
-                  >
-                    {template.title}
-                  </Link>
-                </h2>
-                <p className="mt-3 max-w-md text-[15px] leading-7 text-site-dim">{template.summary}</p>
-                <p className="mt-5 flex flex-wrap gap-1.5" aria-label="Keywords">
-                  {template.keywords.map((keyword) => (
-                    <mark key={keyword} className="marker text-[13px]">
-                      {keyword}
-                    </mark>
-                  ))}
-                </p>
-                <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-7">
-                  <span className="site-mono flex items-center gap-1 text-[12px] text-site-paper">
-                    View playbook
-                    <svg className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M6 3.5 10.5 8 6 12.5" />
-                    </svg>
-                  </span>
-                  <CtaButton
-                    href={`/login?template=${template.slug}`}
-                    variant="secondary"
-                    className="relative z-[1]"
-                  >
-                    Use this template
-                  </CtaButton>
-                </div>
-              </article>
+              <TemplateCard template={template} />
             </li>
           ))}
         </Reveal>
