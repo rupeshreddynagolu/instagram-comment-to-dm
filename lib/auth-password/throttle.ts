@@ -1,11 +1,13 @@
 // Fixed-window counters, kept in memory like the sign-in lockout: per
 // process, so a few workers on cPanel each keep their own count. Enough to
 // stop an inbox being flooded or an email list being run through sign-in.
-const windows = new Map<string, { count: number; expires: number }>();
+const windows = new Map<string, { count: number; limit: number; expires: number }>();
 // Ended windows are cleared at most once a minute, and only once there are
-// many keys. Live counters are never dropped to make room: that would let a
-// flood of new keys reset someone's limit. Past MAX_KEYS, new keys are
-// refused instead, until ended windows can be cleared.
+// many keys. Past MAX_KEYS, room is made by dropping the oldest counter that
+// isn't blocking anyone: a counter at its limit is never dropped (that would
+// lift someone's block), and a flood of new keys can't lock everyone out,
+// since its own keys are the first to go. Only if every counter is blocking
+// is a new key refused.
 const PRUNE_AT = 10_000;
 const MAX_KEYS = 50_000;
 const PRUNE_EVERY_MS = 60_000;
@@ -19,14 +21,26 @@ function prune(now: number) {
   }
 }
 
+/** Drops the oldest counter below its limit; false if every counter is at its limit. */
+function makeRoom(now: number): boolean {
+  // A Map iterates in insertion order, so the first keys are the oldest.
+  for (const [key, entry] of windows) {
+    if (entry.expires <= now || entry.count < entry.limit) {
+      windows.delete(key);
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Counts one use of `key`; false once it has been used `limit` times in the window. */
 export function take(key: string, limit: number, windowMs: number, now: number = Date.now()): boolean {
   const entry = windows.get(key);
   if (!entry || entry.expires <= now) {
     windows.delete(key);
     prune(now);
-    if (windows.size >= MAX_KEYS) return false;
-    windows.set(key, { count: 1, expires: now + windowMs });
+    if (windows.size >= MAX_KEYS && !makeRoom(now)) return false;
+    windows.set(key, { count: 1, limit, expires: now + windowMs });
     return true;
   }
   if (entry.count >= limit) return false;
@@ -73,5 +87,20 @@ export function plainEmail(raw: string): string | null {
  */
 export function clientKey(headers: Headers): string {
   const forwarded = headers.get("x-forwarded-for")?.split(",").at(-1)?.trim();
-  return `ip:${forwarded || headers.get("x-real-ip")?.trim() || "unknown"}`;
+  const address = forwarded || headers.get("x-real-ip")?.trim() || "unknown";
+  return `ip:${address.includes(":") ? ipv6Network(address) : address}`;
+}
+
+/**
+ * An IPv6 address's /64 network: one home or phone usually gets a whole /64,
+ * so counting single addresses would hand it billions of fresh budgets.
+ */
+function ipv6Network(address: string): string {
+  const [head, tail = ""] = address.toLowerCase().split("::");
+  const front = head ? head.split(":") : [];
+  const back = address.includes("::") && tail ? tail.split(":") : [];
+  const groups = address.includes("::")
+    ? [...front, ...Array(Math.max(0, 8 - front.length - back.length)).fill("0"), ...back]
+    : front;
+  return `${groups.slice(0, 4).map((group) => group.replace(/^0+(?=.)/, "")).join(":")}::/64`;
 }

@@ -41,6 +41,13 @@ describe("clientKey", () => {
     expect(clientKey(new Headers({ "x-real-ip": "198.51.100.4" }))).toBe("ip:198.51.100.4");
     expect(clientKey(new Headers())).toBe("ip:unknown");
   });
+
+  it("counts IPv6 clients by their /64 network", () => {
+    const key = (ip: string) => clientKey(new Headers({ "x-real-ip": ip }));
+    expect(key("2001:db8:aa:bb:1:2:3:4")).toBe("ip:2001:db8:aa:bb::/64");
+    expect(key("2001:0db8:00aa:00bb::9")).toBe("ip:2001:db8:aa:bb::/64");
+    expect(key("2001:db8::1")).toBe("ip:2001:db8:0:0::/64");
+  });
 });
 
 describe("plainEmail", () => {
@@ -70,12 +77,17 @@ describe("take, under load", () => {
     expect(throttleSizeForTests()).toBe(1);
   });
 
-  it("refuses new keys when full, rather than dropping live counters", () => {
+  it("keeps a blocked counter through a flood of new keys", () => {
     take("victim", 1, 3_600_000, 0);
-    for (let i = 0; i < 50_010; i++) take(`flood-${i}`, 1, 3_600_000, 0);
+    for (let i = 0; i < 50_010; i++) take(`flood-${i}`, 3, 3_600_000, 0);
     expect(throttleSizeForTests()).toBe(50_000);
-    // The victim's counter survived the flood, so its limit still holds.
+    // The victim is still blocked, and newcomers still get in.
     expect(take("victim", 1, 3_600_000, 1)).toBe(false);
+    expect(take("someone-new", 3, 3_600_000, 1)).toBe(true);
+  });
+
+  it("refuses a new key only when every counter is blocking", () => {
+    for (let i = 0; i < 50_000; i++) take(`blocked-${i}`, 1, 3_600_000, 0);
     expect(take("someone-new", 1, 3_600_000, 1)).toBe(false);
   });
 
