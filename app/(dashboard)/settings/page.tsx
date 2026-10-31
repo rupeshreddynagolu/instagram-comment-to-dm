@@ -475,6 +475,20 @@ export default function SettingsPage() {
         )}
       </section>
 
+      <section className="glass rounded-2xl p-6">
+        <h2 className="text-base font-semibold mb-2">Password</h2>
+        <p className="text-sm text-muted">
+          Sign in with a password, or keep using email links. Changing your password signs you
+          out on other devices.
+        </p>
+        <a
+          href="/account/password?next=/settings"
+          className="mt-4 inline-flex px-4 py-2 rounded-xl text-sm font-medium bg-surface border border-border text-foreground hover:border-border-hover transition-colors"
+        >
+          Set or change password
+        </a>
+      </section>
+
       <section id="billing" className="glass scroll-mt-24 rounded-2xl p-6">
         <h2 className="text-base font-semibold mb-6">Billing</h2>
 
