@@ -1,54 +1,75 @@
 import Link from "next/link";
+import SiteMark from "@/components/site-mark";
+import CtaButton from "@/components/site/cta-button";
+import MobileMenu from "@/components/site/mobile-menu";
+
+export type SiteSection = "home" | "templates" | "agencies";
 
 interface PublicSiteHeaderProps {
-  active?: "home" | "templates";
+  active?: SiteSection;
 }
 
 const navLinks = [
   { label: "Templates", href: "/templates", key: "templates" },
+  { label: "Product", href: "/#product", key: "product" },
+  { label: "Use cases", href: "/#use-cases", key: "use-cases" },
   { label: "Agencies", href: "/instagram-dm-automation-agencies", key: "agencies" },
   { label: "Pricing", href: "/#pricing", key: "pricing" },
-  { label: "Security", href: "/#security", key: "security" },
 ];
 
+// Every item in the bar shares one face, size and height.
+const item =
+  "site-mono inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[13px] transition-colors md:min-h-9";
+
+/**
+ * The site header on every public page: one floating glass bar holding the
+ * mark, the sections, and the sign-in actions.
+ */
 export default function PublicSiteHeader({ active }: PublicSiteHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-background/85 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-3" aria-label="ReplyNxt home">
-          <span className="flex h-9 w-9 items-center justify-center border border-cyan-200/20 bg-cyan-300/10 text-sm font-black text-cyan-100">
-            CC
-          </span>
-          <span className="text-lg font-bold text-white">ReplyNxt</span>
+    <header className="pointer-events-none fixed inset-x-0 top-0 z-40 px-3 pt-3 sm:px-6 sm:pt-4">
+      <div className="glass pointer-events-auto mx-auto flex w-full max-w-6xl items-center justify-between gap-2 rounded-full p-1.5 pl-4">
+        <Link href="/" className={`${item} -ml-2 font-semibold text-site-paper`} aria-label="ReplyNxt home">
+          <SiteMark className="h-6 w-6" />
+          <span className="text-[15px] tracking-tight">ReplyNxt</span>
         </Link>
 
-        <nav className="hidden items-center gap-7 md:flex">
+        <nav aria-label="Main" className="hidden items-center lg:flex">
           {navLinks.map((link) => (
             <Link
               key={link.key}
               href={link.href}
-              className={`text-sm font-medium transition ${
-                active === link.key ? "text-white" : "text-zinc-400 hover:text-white"
+              aria-current={active === link.key ? "page" : undefined}
+              className={`${item} ${
+                active === link.key
+                  ? "text-site-paper"
+                  : "text-site-dim hover:text-site-paper"
               }`}
             >
+              {active === link.key && (
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-site-marker" />
+              )}
               {link.label}
             </Link>
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/login"
-            className="hidden px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:text-white sm:inline-flex"
-          >
+        <div className="flex items-center gap-1">
+          <Link href="/login" className={`${item} text-site-paper hover:bg-white/5 max-sm:hidden`}>
             Sign in
           </Link>
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center bg-cyan-300 px-4 py-2 text-sm font-bold text-zinc-950 transition hover:bg-cyan-200"
-          >
+          {/* The primary action: the same button as every other "Start". */}
+          {/* Same face, size and height as the other items; only the fill
+              marks it as the main action. */}
+          <CtaButton href="/login" size="sm" chevron={false} className="site-mono px-4 font-semibold">
             Start free
-          </Link>
+          </CtaButton>
+
+          <MobileMenu
+            className="lg:hidden"
+            active={active}
+            links={[...navLinks, { label: "Sign in", href: "/login", key: "sign-in" }]}
+          />
         </div>
       </div>
     </header>

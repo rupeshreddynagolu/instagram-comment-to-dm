@@ -31,7 +31,7 @@ export const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
       "Hey {username}, here is the product link you asked for: https://yourstore.com/product",
     triggerExample: "LINK please",
     privateReplyPreview:
-      "Hey Maya, here is the product link you asked for: yourstore.com/product",
+      "Hey Ananya, here is the product link you asked for: yourstore.com/product",
     setupMinutes: 4,
     outcome: "More warm product conversations from high-intent comments.",
     bestFor: ["Product drops", "UGC reels", "Influencer campaigns"],
@@ -57,7 +57,7 @@ export const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
       "Hey {username}, here is the form to get the property details and next available showing slots: https://yourlink.com/home",
     triggerExample: "HOME details",
     privateReplyPreview:
-      "Hey Jordan, here is the form to get property details and showing slots.",
+      "Hey Rohan, here is the form to get property details and showing slots.",
     setupMinutes: 5,
     outcome: "Capture listing interest before it gets buried in comments.",
     bestFor: ["Listing reels", "Neighborhood guides", "Seller valuation posts"],
@@ -83,7 +83,7 @@ export const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
       "Hey {username}, here is the free plan from the reel: https://yourlink.com/fitness-plan",
     triggerExample: "PLAN",
     privateReplyPreview:
-      "Hey Sam, here is the free plan from the reel: yourlink.com/fitness-plan",
+      "Hey Meera, here is the free plan from the reel: yourlink.com/fitness-plan",
     setupMinutes: 3,
     outcome: "Move motivated followers into a coaching or email funnel.",
     bestFor: ["Workout reels", "Transformation posts", "Challenge launches"],
@@ -109,7 +109,7 @@ export const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
       "Hey {username}, here is the free class registration link: https://yourlink.com/webinar",
     triggerExample: "WEBINAR",
     privateReplyPreview:
-      "Hey Alex, here is the free class registration link: yourlink.com/webinar",
+      "Hey Kabir, here is the free class registration link: yourlink.com/webinar",
     setupMinutes: 4,
     outcome: "Convert educational reach into webinar and waitlist registrations.",
     bestFor: ["Course launches", "Mini trainings", "Live workshops"],
@@ -135,7 +135,7 @@ export const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
       "Hey {username}, here is our service menu and booking link: https://yourlink.com/booking",
     triggerExample: "PRICE",
     privateReplyPreview:
-      "Hey Riley, here is our service menu and booking link.",
+      "Hey Ishita, here is our service menu and booking link.",
     setupMinutes: 4,
     outcome: "Reduce repetitive comment replies and move buyers toward booking.",
     bestFor: ["Before/after reels", "Service menu posts", "Availability posts"],
@@ -161,7 +161,7 @@ export const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
       "Hey {username}, here is our menu and reservation link: https://yourlink.com/menu",
     triggerExample: "MENU",
     privateReplyPreview:
-      "Hey Taylor, here is our menu and reservation link.",
+      "Hey Arjun, here is our menu and reservation link.",
     setupMinutes: 3,
     outcome: "Turn food reels into reservations and menu views.",
     bestFor: ["Specials", "New menu launches", "Weekend reservation pushes"],
@@ -187,7 +187,7 @@ export const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
       "Hey {username}, here is the RSVP link with event details: https://yourlink.com/rsvp",
     triggerExample: "RSVP",
     privateReplyPreview:
-      "Hey Morgan, here is the RSVP link with event details.",
+      "Hey Diya, here is the RSVP link with event details.",
     setupMinutes: 4,
     outcome: "Convert event attention into measurable RSVPs.",
     bestFor: ["Popups", "Workshops", "Community events"],
@@ -213,7 +213,7 @@ export const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
       "Hey {username}, here is my media kit and partnership form: https://yourlink.com/media-kit",
     triggerExample: "COLLAB",
     privateReplyPreview:
-      "Hey Casey, here is my media kit and partnership form.",
+      "Hey Vikram, here is my media kit and partnership form.",
     setupMinutes: 4,
     outcome: "Capture brand interest without asking people to search your bio.",
     bestFor: ["Pinned portfolio reels", "Case study posts", "Brand outreach"],

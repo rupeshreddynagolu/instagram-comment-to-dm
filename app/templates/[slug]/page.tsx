@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import PublicSiteHeader from "@/components/public-site-header";
+import SiteShell from "@/components/site-shell";
+import CtaButton from "@/components/site/cta-button";
 import TemplateVisual from "@/components/template-visual";
+import { GlassCard, SectionHeading } from "@/components/site/primitives";
+import Reveal from "@/components/site/reveal";
+import SplitHeadline from "@/components/site/split-headline";
 import {
   CAMPAIGN_TEMPLATES,
   getCampaignTemplate,
@@ -55,162 +59,142 @@ export default async function TemplateDetailPage({ params }: TemplatePageProps) 
   ).slice(0, 3);
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <PublicSiteHeader active="templates" />
-
-      <section className="border-b border-white/10 bg-zinc-950/55">
-        <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-14 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8 lg:py-20">
-          <div>
-            <Link
-              href="/templates"
-              className="text-sm font-semibold text-zinc-400 transition hover:text-white"
-            >
-              Back to templates
-            </Link>
-            <p className="mt-8 text-sm font-bold uppercase tracking-wide text-cyan-200">
-              {template.category} template
-            </p>
-            <h1 className="mt-4 text-5xl font-black leading-[1.02] text-white sm:text-6xl">
-              {template.title}
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-300">
-              {template.summary}
-            </p>
+    <SiteShell active="templates">
+      <section className="mx-auto grid w-full max-w-6xl items-start gap-12 px-4 pb-16 pt-8 sm:px-6 sm:pt-12 lg:grid-cols-[1.05fr_0.95fr]">
+        <div>
+          <Link
+            href="/templates"
+            className="site-mono inline-flex min-h-11 items-center gap-1.5 text-[13px] text-site-dim transition-colors hover:text-site-paper"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M10 3.5 5.5 8l4.5 4.5" />
+            </svg>
+            All templates
+          </Link>
+          <Reveal onLoadDelay={0}>
+            <p className="site-mono mt-6 text-[13px] text-site-paper">{template.category} template</p>
+          </Reveal>
+          <SplitHeadline as="h1" onLoad className="mt-3 text-[clamp(2.75rem,5.5vw,4.75rem)] leading-[1]">
+            {template.title}
+          </SplitHeadline>
+          <Reveal onLoadDelay={0.4}>
+            <p className="mt-6 max-w-xl text-lg leading-8 text-site-paper/85">{template.summary}</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href={`/login?template=${template.slug}`}
-                className="inline-flex items-center justify-center bg-cyan-300 px-6 py-3 text-sm font-bold text-zinc-950 transition hover:bg-cyan-200"
-              >
+              <CtaButton href={`/login?template=${template.slug}`} size="lg">
                 Use this template
-              </Link>
-              <a
-                href="#playbook"
-                className="inline-flex items-center justify-center border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-bold text-white transition hover:border-white/20 hover:bg-white/[0.08]"
-              >
-                Read playbook
-              </a>
+              </CtaButton>
+              <CtaButton href="#playbook" size="lg" variant="secondary">
+                Read the playbook
+              </CtaButton>
             </div>
-          </div>
-
-          <TemplateVisual template={template} />
+            <dl className="mt-10 grid max-w-lg grid-cols-3 gap-6 border-t border-white/10 pt-6">
+              <div className="flex flex-col-reverse gap-1">
+                <dt className="site-mono text-[12px] text-site-dim">Audience</dt>
+                <dd className="font-semibold">{template.audience}</dd>
+              </div>
+              <div className="flex flex-col-reverse gap-1">
+                <dt className="site-mono text-[12px] text-site-dim">Setup time</dt>
+                <dd className="font-semibold">{template.setupMinutes} minutes</dd>
+              </div>
+              <div className="flex flex-col-reverse gap-1">
+                <dt className="site-mono text-[12px] text-site-dim">Campaign goal</dt>
+                <dd className="font-semibold">{template.goal}</dd>
+              </div>
+            </dl>
+          </Reveal>
         </div>
+
+        <Reveal onLoadDelay={0.55}>
+          <TemplateVisual template={template} />
+        </Reveal>
       </section>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-8 px-5 py-16 sm:px-6 lg:grid-cols-[0.78fr_1.22fr] lg:px-8">
-        <aside className="space-y-4">
-          <div className="border border-white/10 bg-white/[0.035] p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Audience
-            </p>
-            <p className="mt-2 text-lg font-bold text-white">{template.audience}</p>
-          </div>
-          <div className="border border-white/10 bg-white/[0.035] p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Setup time
-            </p>
-            <p className="mt-2 text-lg font-bold text-white">
-              {template.setupMinutes} minutes
-            </p>
-          </div>
-          <div className="border border-white/10 bg-white/[0.035] p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Campaign goal
-            </p>
-            <p className="mt-2 text-lg font-bold text-white">{template.goal}</p>
-          </div>
-        </aside>
-
-        <div id="playbook" className="space-y-8">
-          <section className="border border-white/10 bg-white/[0.035] p-6">
-            <h2 className="text-2xl font-black text-white">Campaign Outcome</h2>
-            <p className="mt-3 text-base leading-8 text-zinc-300">
-              {template.outcome}
-            </p>
-          </section>
-
-          <section className="border border-white/10 bg-white/[0.035] p-6">
-            <h2 className="text-2xl font-black text-white">Setup Playbook</h2>
-            <ol className="mt-5 space-y-3">
+      <section id="playbook" className="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6 sm:py-24">
+        <div className="grid gap-12 lg:grid-cols-[0.85fr_1.15fr]">
+          <SectionHeading label="Campaign outcome" title="What this campaign gets you" description={template.outcome} />
+          <GlassCard className="p-6 sm:p-8">
+            <p className="site-mono text-[13px] text-site-dim">Setup playbook</p>
+            <ol className="mt-5 space-y-5">
               {template.playbook.map((step, index) => (
-                <li key={step} className="grid gap-3 sm:grid-cols-[40px_1fr]">
-                  <span className="flex h-8 w-8 items-center justify-center bg-cyan-300 text-sm font-black text-zinc-950">
+                <li key={step} className="flex gap-4">
+                  <span
+                    aria-hidden="true"
+                    className="site-mono flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 text-[13px]"
+                  >
                     {index + 1}
                   </span>
-                  <span className="text-sm leading-7 text-zinc-300">{step}</span>
+                  <span className="pt-1 text-base leading-7">{step}</span>
                 </li>
               ))}
             </ol>
-          </section>
-
-          <section className="grid gap-4 md:grid-cols-2">
-            <div className="border border-white/10 bg-white/[0.035] p-6">
-              <h2 className="text-xl font-black text-white">Best For</h2>
-              <ul className="mt-4 space-y-2">
-                {template.bestFor.map((item) => (
-                  <li key={item} className="text-sm text-zinc-300">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="border border-white/10 bg-white/[0.035] p-6">
-              <h2 className="text-xl font-black text-white">Metrics To Watch</h2>
-              <ul className="mt-4 space-y-2">
-                {template.metrics.map((item) => (
-                  <li key={item} className="text-sm text-zinc-300">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-
-          <section className="border border-cyan-200/20 bg-cyan-300/10 p-6">
-            <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div>
-                <h2 className="text-2xl font-black text-white">
-                  Copy this campaign into ReplyNxt
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-zinc-300">
-                  Sign in, connect Instagram, pick a post or reel, and the
-                  template copy will be ready for your campaign draft.
-                </p>
-              </div>
-              <Link
-                href={`/login?template=${template.slug}`}
-                className="inline-flex items-center justify-center bg-cyan-300 px-6 py-3 text-sm font-bold text-zinc-950 transition hover:bg-cyan-200"
-              >
-                Use this template
-              </Link>
-            </div>
-          </section>
+          </GlassCard>
         </div>
+
+        <Reveal stagger className="mt-4 grid gap-4 md:grid-cols-2">
+          <GlassCard className="p-6 sm:p-8">
+            <h2 className="text-2xl">Best for</h2>
+            <ul className="mt-4 space-y-3">
+              {template.bestFor.map((item) => (
+                <li key={item} className="flex gap-3 text-[15px] leading-7 text-site-paper/90">
+                  <span aria-hidden="true" className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-site-reply" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </GlassCard>
+          <GlassCard className="p-6 sm:p-8">
+            <h2 className="text-2xl">Metrics to watch</h2>
+            <ul className="mt-4 space-y-3">
+              {template.metrics.map((item) => (
+                <li key={item} className="flex gap-3 text-[15px] leading-7 text-site-paper/90">
+                  <span aria-hidden="true" className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-site-marker" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </GlassCard>
+        </Reveal>
       </section>
 
-      <section className="border-t border-white/10 bg-zinc-950/60 py-14">
-        <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-black text-white">More templates</h2>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {relatedTemplates.map((item) => (
-              <Link
-                key={item.slug}
-                href={`/templates/${item.slug}`}
-                className="border border-white/10 bg-white/[0.035] p-5 transition hover:border-white/20 hover:bg-white/[0.055]"
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
-                  {item.category}
-                </p>
-                <h3 className="mt-3 text-lg font-black text-white">
-                  {item.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  {item.summary}
-                </p>
-              </Link>
-            ))}
+      <section className="mx-auto w-full max-w-6xl px-4 pb-8 sm:px-6">
+        <GlassCard glow="orange" className="flex flex-col gap-6 px-6 py-10 sm:px-10 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-3xl leading-tight sm:text-4xl">Copy this campaign into ReplyNxt</h2>
+            <p className="mt-2 max-w-xl text-base leading-7 text-site-dim">
+              Sign in, connect Instagram, pick a post or reel, and the template copy is ready in
+              your campaign draft.
+            </p>
           </div>
-        </div>
+          <CtaButton href={`/login?template=${template.slug}`} size="lg" className="shrink-0 self-start lg:self-auto">
+            Use this template
+          </CtaButton>
+        </GlassCard>
       </section>
-    </main>
+
+      <section className="mx-auto w-full max-w-6xl px-4 pb-24 pt-16 sm:px-6">
+        <SectionHeading label="Keep browsing" title="More templates" />
+        <Reveal stagger as="ul" className="mt-10 grid gap-4 md:grid-cols-3">
+          {relatedTemplates.map((item) => (
+            <li key={item.slug}>
+              <Link
+                href={`/templates/${item.slug}`}
+                className="use-card glass group flex h-full flex-col gap-4 rounded-[1.75rem] p-6"
+              >
+                <p className="site-mono text-[12px] text-site-dim">{item.category}</p>
+                <span className="text-xl font-semibold leading-tight">{item.title}</span>
+                <p className="text-[15px] leading-6 text-site-dim">{item.summary}</p>
+                <p className="mt-auto flex flex-wrap gap-1.5">
+                  {item.keywords.map((keyword) => (
+                    <mark key={keyword} className="marker text-[12px]">
+                      {keyword}
+                    </mark>
+                  ))}
+                </p>
+              </Link>
+            </li>
+          ))}
+        </Reveal>
+      </section>
+    </SiteShell>
   );
 }
