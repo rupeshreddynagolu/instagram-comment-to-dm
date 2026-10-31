@@ -23,7 +23,7 @@ export default async function PasswordPage({
     ? await prisma.user.findUnique({ where: { id: userId }, select: { email: true, passwordHash: true } })
     : null;
   const hasPassword = Boolean(user?.passwordHash);
-  const needsCurrent = user ? !mayChangeWithoutCurrentPassword(user, await currentSession()) : false;
+  const needsCurrent = user ? !mayChangeWithoutCurrentPassword(user, userId ? await currentSession(userId) : null) : false;
   const destination = safeCallbackPath(next, "/dashboard");
 
   return (

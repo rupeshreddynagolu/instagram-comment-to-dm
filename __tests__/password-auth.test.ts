@@ -87,26 +87,28 @@ describe("authenticateWithPassword", () => {
     });
   });
 
-  it("counts failures per account, so other spellings of the same email can't dodge the lock", async () => {
-    const passwordHash = await hashPassword("right password");
-    // MySQL's default collation finds the same row for these.
-    mockPrisma.user.findUnique.mockResolvedValue({ id: "user_1", passwordHash, emailVerified: new Date() });
-    const spellings = ["a@example.com", "A@example.com", "á@example.com", "a@exámple.com", "a@example.com"];
-    for (const email of spellings) {
+  it("refuses non-ASCII emails before looking anything up, so the lock key always matches the database", async () => {
+    expect(await authenticateWithPassword("á@example.com", "any password")).toEqual({ ok: false, reason: "invalid" });
+    expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("locks an email across letter case, whether or not an account exists", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    for (const email of ["x@example.com", "X@example.com", "x@EXAMPLE.com", "X@Example.Com", "x@example.com"]) {
       await authenticateWithPassword(email, "wrong password");
     }
-    expect(await authenticateWithPassword("à@example.com", "right password")).toEqual({
+    expect(await authenticateWithPassword("x@example.COM", "any password")).toEqual({ ok: false, reason: "locked" });
+  });
+
+  it("shares one budget between sign-in and the current-password check", async () => {
+    const passwordHash = await hashPassword("right password");
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "user_7", passwordHash, emailVerified: new Date() });
+    for (let i = 0; i < 3; i++) await verifyCurrentPassword("user_7", passwordHash, "wrong guess");
+    for (let i = 0; i < 2; i++) await authenticateWithPassword("seven@example.com", "wrong password");
+    expect(await authenticateWithPassword("seven@example.com", "right password")).toEqual({
       ok: false,
       reason: "locked",
     });
-  });
-
-  it("locks spellings of an unknown email together too, so the lock doesn't reveal which accounts exist", async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(null);
-    for (const email of ["x@example.com", "X@example.com", "ẋ@example.com", "x@exämple.com", "x@example.com"]) {
-      await authenticateWithPassword(email, "wrong password");
-    }
-    expect(await authenticateWithPassword("x@EXAMPLE.com", "any password")).toEqual({ ok: false, reason: "locked" });
   });
 
   it("locks an email for a while after repeated failures, even with the right password", async () => {

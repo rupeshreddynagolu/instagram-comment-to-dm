@@ -33,7 +33,7 @@ export async function setPassword(
     select: { passwordHash: true },
   });
   if (!user) redirect("/login");
-  const session = await currentSession();
+  const session = await currentSession(userId);
 
   // An open session isn't enough to replace an existing password: the old
   // password, or a fresh email-link sign-in, has to back it up.

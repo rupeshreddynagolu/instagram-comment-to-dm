@@ -5,8 +5,9 @@ export type PasswordSignIn =
   | { ok: true; userId: string }
   | { ok: false; reason: "invalid" | "unverified" | "locked" };
 
-// Failed attempts per account (or per email when there is no account), kept in
-// memory: after five in fifteen minutes it is locked for the rest of that window. Per process, which on cPanel
+// Failed attempts, kept in memory, counted against the email and (when it
+// exists) the account: after five in fifteen minutes either is locked for the
+// rest of that window. Per process, which on cPanel
 // means a determined attacker gets a few windows' worth across workers; it
 // still turns guessing into a crawl.
 const MAX_FAILURES = 5;
@@ -32,9 +33,14 @@ function recordFailure(key: string) {
   }
 }
 
-/** The email folded the way MySQL's case- and accent-insensitive collation folds it. */
+/** The lockout key for an email: lowercased, which for ASCII matches MySQL's
+ * case-insensitive comparison exactly. Non-ASCII emails never get this far. */
 function lockKey(email: string): string {
-  return `email:${email.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase()}`;
+  return `email:${email}`;
+}
+
+function accountKey(userId: string): string {
+  return `user:${userId}`;
 }
 
 export function resetAttemptsForTests() {
@@ -50,35 +56,44 @@ export async function authenticateWithPassword(
   password: string
 ): Promise<PasswordSignIn> {
   const email = rawEmail.trim().toLowerCase();
+  const emailKey = lockKey(email);
 
-  const user = email
-    ? await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, passwordHash: true, emailVerified: true },
-      })
-    : null;
+  // MySQL compares emails ignoring case and accents. Lowercasing matches that
+  // exactly only for ASCII, so other characters are refused before the lookup:
+  // the lock key and the row it finds can never disagree.
+  if (!email || !/^[\x21-\x7e]+$/.test(email)) {
+    recordFailure(emailKey);
+    return { ok: false, reason: "invalid" };
+  }
+  if (isLocked(emailKey)) return { ok: false, reason: "locked" };
 
-  // Failures count by the email as MySQL matches it (ignoring case and
-  // accents), the same way whether or not an account exists: every spelling
-  // of one address shares one lock, and the lock reveals nothing.
-  const key = lockKey(email);
-  if (isLocked(key)) return { ok: false, reason: "locked" };
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, passwordHash: true, emailVerified: true },
+  });
 
   if (!user?.passwordHash) {
     decoyHash ??= hashPassword("decoy password for timing");
     await verifyPassword(password, await decoyHash);
-    recordFailure(key);
+    recordFailure(emailKey);
     return { ok: false, reason: "invalid" };
   }
 
+  // The account's own budget is shared with the current-password check, so
+  // sign-in and re-authentication can't each take five guesses.
+  const userKey = accountKey(user.id);
+  if (isLocked(userKey)) return { ok: false, reason: "locked" };
+
   if (!(await verifyPassword(password, user.passwordHash))) {
-    recordFailure(key);
+    recordFailure(emailKey);
+    recordFailure(userKey);
     return { ok: false, reason: "invalid" };
   }
 
   if (!user.emailVerified) return { ok: false, reason: "unverified" };
 
-  failures.delete(key);
+  failures.delete(emailKey);
+  failures.delete(userKey);
   return { ok: true, userId: user.id };
 }
 
@@ -91,7 +106,7 @@ export async function verifyCurrentPassword(
   passwordHash: string | null,
   password: string
 ): Promise<"ok" | "invalid" | "locked"> {
-  const key = `user:${userId}`;
+  const key = accountKey(userId);
   if (isLocked(key)) return "locked";
   if (!passwordHash || !(await verifyPassword(password, passwordHash))) {
     recordFailure(key);

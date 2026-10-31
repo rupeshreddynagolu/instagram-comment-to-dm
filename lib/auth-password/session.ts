@@ -41,14 +41,19 @@ export async function startSession(userId: string): Promise<void> {
   });
 }
 
-/** This request's session row, or null. */
-export async function currentSession() {
+/**
+ * This request's session row, but only if it belongs to the given (signed-in)
+ * user. The cookie is read here separately from Auth.js, so the row is
+ * checked against the user Auth.js resolved rather than trusted on its own.
+ */
+export async function currentSession(userId: string) {
   const token = (await cookies()).get(await sessionCookieName())?.value;
   if (!token) return null;
-  return prisma.session.findUnique({
+  const session = await prisma.session.findUnique({
     where: { sessionToken: token },
-    select: { id: true, createdAt: true, viaPassword: true },
+    select: { id: true, userId: true, createdAt: true, viaPassword: true },
   });
+  return session && session.userId === userId && session.createdAt !== undefined ? session : null;
 }
 
 /** Ends every other session of this user, e.g. after a password change. */
