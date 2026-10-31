@@ -1,7 +1,5 @@
 import Link from "next/link";
-import MagicLinkButton from "@/components/magic-link-button";
-import PasswordSignInForm from "@/components/password-sign-in-form";
-import { sendMagicLink } from "@/app/login/actions";
+import SignInForm from "@/components/sign-in-form";
 import SiteShell from "@/components/site-shell";
 import { GlassCard } from "@/components/site/primitives";
 import Reveal from "@/components/site/reveal";
@@ -16,7 +14,7 @@ export const metadata = {
 
 // What happens after signing in, in order.
 const steps = [
-  { title: "Sign in with your email", body: "We send a one-time link. No password to remember." },
+  { title: "Enter your email", body: "Back again? Use your password. New here? We email a link to verify it." },
   { title: "Connect Instagram", body: "Link your Instagram professional account through Meta." },
   { title: "Pick a post and go live", body: "Choose the keywords and the reply. ReplyNxt handles the rest." },
 ];
@@ -38,10 +36,6 @@ export default async function LoginPage({
     error?: string;
     callbackUrl?: string;
     template?: string;
-    /** "link" shows the email-link form instead of the password one. */
-    method?: string;
-    /** Why the link form is shown: "signup" or "forgot" change its wording. */
-    reason?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -52,34 +46,11 @@ export default async function LoginPage({
     : null;
   const callbackUrl = params.callbackUrl ?? templateCallbackUrl ?? "/dashboard";
 
-  const useLink = params.method === "link" || Boolean(params.error);
-  const reason = params.reason === "signup" || params.reason === "forgot" ? params.reason : null;
-
-  // Links between the two forms keep where the visitor was heading.
-  const keep = new URLSearchParams();
-  if (params.callbackUrl) keep.set("callbackUrl", params.callbackUrl);
-  if (params.template) keep.set("template", params.template);
-  const href = (extra: Record<string, string>) => {
-    const query = new URLSearchParams(keep);
-    for (const [key, value] of Object.entries(extra)) query.set(key, value);
-    const text = query.toString();
-    return text ? `/login?${text}` : "/login";
-  };
-
-  const linkCopy = {
-    signup: {
-      title: "Create your account",
-      body: "Enter your email and we'll send a link to verify it. Then you'll set a password.",
-    },
-    forgot: {
-      title: "Reset your password",
-      body: "We'll email you a sign-in link. Follow it, then choose a new password.",
-    },
-    default: {
-      title: "Sign in with an email link",
-      body: "No password needed. We'll email you a secure link that signs you in.",
-    },
-  }[reason ?? "default"];
+  const linkError = params.error
+    ? params.error === "Verification"
+      ? "That sign-in link has expired or was already used. Enter your email to get a new one."
+      : "The sign-in email could not be sent. Check the address and try again."
+    : null;
 
   return (
     <SiteShell footer={false}>
@@ -151,7 +122,7 @@ export default async function LoginPage({
                 </p>
                 <p className="mt-6 text-[15px] text-site-dim">
                   Nothing arrived? Check spam, or{" "}
-                  <Link href="/login?method=link" className="font-semibold text-site-paper underline underline-offset-4 hover:text-site-reply-hover">
+                  <Link href="/login" className="font-semibold text-site-paper underline underline-offset-4 hover:text-site-reply-hover">
                     send a new link
                   </Link>
                   .
@@ -159,98 +130,14 @@ export default async function LoginPage({
               </div>
             ) : (
               <>
-                {/* Two ways in: a password, or an email link (which is also
-                    how an email gets verified). */}
-                <div role="tablist" aria-label="Sign-in method" className="grid grid-cols-2 rounded-full border border-white/10 bg-white/[0.04] p-1">
-                  {[
-                    { label: "Password", active: !useLink, to: href({}) },
-                    { label: "Email link", active: useLink, to: href({ method: "link" }) },
-                  ].map((tab) => (
-                    <Link
-                      key={tab.label}
-                      href={tab.to}
-                      role="tab"
-                      aria-selected={tab.active}
-                      className={`flex min-h-10 items-center justify-center rounded-full text-[14px] font-semibold transition-colors ${
-                        tab.active ? "bg-site-paper text-site-ink" : "text-site-dim hover:text-site-paper"
-                      }`}
-                    >
-                      {tab.label}
-                    </Link>
-                  ))}
+                <h2 className="text-3xl leading-tight">Sign in or create an account</h2>
+                <p className="mt-2 text-[15px] leading-6 text-site-dim">
+                  Start with your email. We&apos;ll ask for your password, or send a link if you&apos;re new.
+                </p>
+                <div className="mt-7">
+                  <SignInForm callbackUrl={callbackUrl} linkError={linkError} />
                 </div>
-
-                {useLink ? (
-                  <>
-                    <h2 className="mt-7 text-3xl leading-tight">{linkCopy.title}</h2>
-                    <p className="mt-2 text-[15px] leading-6 text-site-dim">{linkCopy.body}</p>
-                    <form action={sendMagicLink} className="mt-7 space-y-5">
-                      <input type="hidden" name="callbackUrl" value={callbackUrl} />
-                      {reason === "forgot" && <input type="hidden" name="reason" value="forgot" />}
-                      <div className="space-y-2">
-                        <label htmlFor="email" className="block text-[15px] font-semibold">
-                          Email
-                        </label>
-                        <input
-                          id="email"
-                          name="email"
-                          type="email"
-                          required
-                          autoComplete="email"
-                          inputMode="email"
-                          placeholder="you@company.com"
-                          aria-describedby={params.error ? "login-error" : undefined}
-                          className="min-h-12 w-full rounded-2xl border border-white/12 bg-black/30 px-4 text-base text-site-paper shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] transition-colors placeholder:text-site-dim/70 focus:border-site-reply focus:outline-none focus:ring-4 focus:ring-site-reply/15"
-                        />
-                      </div>
-
-                      {params.error && (
-                        <p
-                          id="login-error"
-                          role="alert"
-                          className="rounded-2xl border border-site-marker/30 bg-site-marker/10 px-4 py-3 text-[15px] leading-6 text-[#ffb59e]"
-                        >
-                          {params.error === "Verification"
-                            ? "That sign-in link has expired or was already used. Enter your email to get a new one."
-                            : "The sign-in email could not be sent. Check the address and try again."}
-                        </p>
-                      )}
-
-                      <MagicLinkButton />
-                    </form>
-                  </>
-                ) : (
-                  <>
-                    <h2 className="mt-7 text-3xl leading-tight">Welcome back</h2>
-                    <p className="mt-2 text-[15px] leading-6 text-site-dim">Sign in with your email and password.</p>
-                    <div className="mt-7">
-                      <PasswordSignInForm
-                        callbackUrl={callbackUrl}
-                        forgotHref={href({ method: "link", reason: "forgot" })}
-                      />
-                    </div>
-                  </>
-                )}
-
-                {reason === "signup" ? (
-                  <p className="mt-6 text-[14px] text-site-dim">
-                    Already have an account?{" "}
-                    <Link href={href({})} className="font-semibold text-site-paper underline underline-offset-4 hover:text-site-reply-hover">
-                      Sign in
-                    </Link>
-                  </p>
-                ) : (
-                  <p className="mt-6 text-[14px] text-site-dim">
-                    New to ReplyNxt?{" "}
-                    <Link
-                      href={href({ method: "link", reason: "signup" })}
-                      className="font-semibold text-site-paper underline underline-offset-4 hover:text-site-reply-hover"
-                    >
-                      Create an account
-                    </Link>
-                  </p>
-                )}
-                <p className="mt-3 text-[13px] leading-5 text-site-dim">
+                <p className="mt-6 text-[13px] leading-5 text-site-dim">
                   By continuing you agree to the{" "}
                   <Link href="/terms" className="text-site-paper underline underline-offset-4 hover:text-site-reply-hover">
                     Terms

@@ -78,9 +78,9 @@ export async function setPassword(
  */
 export async function emailResetLink(formData: FormData): Promise<void> {
   const userId = await getCurrentUserId();
-  if (!userId) redirect("/login?method=link&reason=forgot");
+  if (!userId) redirect("/login");
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-  if (!user?.email) redirect("/login?method=link&reason=forgot");
+  if (!user?.email) redirect("/login");
 
   const next = safeCallbackPath(String(formData.get("next") ?? ""));
   await signIn(EMAIL_PROVIDER_ID, {

@@ -1,14 +1,36 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { prisma } from "@/lib/db/client";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/account", "/automations", "/campaigns", "/logs", "/settings"];
 
+const SESSION_COOKIES = [
+  "authjs.session-token",
+  "__Secure-authjs.session-token",
+  "next-auth.session-token",
+  "__Secure-next-auth.session-token",
+];
+
 function hasSessionCookie(request: NextRequest): boolean {
-  return (
-    request.cookies.has("authjs.session-token") ||
-    request.cookies.has("__Secure-authjs.session-token") ||
-    request.cookies.has("next-auth.session-token") ||
-    request.cookies.has("__Secure-next-auth.session-token")
-  );
+  return SESSION_COOKIES.some((name) => request.cookies.has(name));
+}
+
+/**
+ * Whether the cookie's session still exists. A cookie can outlive its
+ * session (signed out elsewhere, expired, or ended by a password change);
+ * trusting the cookie alone would bounce /login to the dashboard and the
+ * dashboard straight back to /login, forever.
+ */
+async function hasLiveSession(request: NextRequest): Promise<boolean> {
+  for (const name of SESSION_COOKIES) {
+    const token = request.cookies.get(name)?.value;
+    if (!token) continue;
+    const session = await prisma.session.findUnique({
+      where: { sessionToken: token },
+      select: { expires: true },
+    });
+    if (session && session.expires > new Date()) return true;
+  }
+  return false;
 }
 
 /**
@@ -37,7 +59,7 @@ function signedInDestination(request: NextRequest): URL {
   return new URL("/dashboard", request.url);
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isProtected = PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -54,7 +76,18 @@ export function proxy(request: NextRequest) {
   }
 
   if (isLogin && isAuthenticated) {
-    return NextResponse.redirect(signedInDestination(request));
+    if (await hasLiveSession(request)) {
+      return NextResponse.redirect(signedInDestination(request));
+    }
+    // A dead session: show the login page and drop the stale cookie.
+    const response = NextResponse.next();
+    for (const name of SESSION_COOKIES) {
+      // A __Secure- cookie is only replaced by one that is itself Secure.
+      if (request.cookies.has(name)) {
+        response.cookies.set(name, "", { path: "/", maxAge: 0, secure: name.startsWith("__Secure-") });
+      }
+    }
+    return response;
   }
 
   return NextResponse.next();
