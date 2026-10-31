@@ -35,10 +35,21 @@ export function getPlanForPriceId(priceId: string | null | undefined): Plan {
   return "FREE";
 }
 
+export type PaidPlan = "PRO" | "AGENCY";
+export type BillingInterval = "MONTHLY" | "YEARLY";
+
+/** The env var holding the Razorpay plan ID for a tier billed at an interval. */
+export function razorpayPlanEnvName(plan: PaidPlan, interval: BillingInterval) {
+  return `RAZORPAY_PLAN_${plan}${interval === "YEARLY" ? "_YEARLY" : ""}` as const;
+}
+
 export function getPlanForRazorpayPlanId(planId: string | null | undefined): Plan {
   if (!planId) return "FREE";
-  if (planId === process.env.RAZORPAY_PLAN_AGENCY) return "AGENCY";
-  if (planId === process.env.RAZORPAY_PLAN_PRO) return "PRO";
+  for (const plan of ["AGENCY", "PRO"] as const) {
+    for (const interval of ["MONTHLY", "YEARLY"] as const) {
+      if (planId === process.env[razorpayPlanEnvName(plan, interval)]) return plan;
+    }
+  }
   return "FREE";
 }
 

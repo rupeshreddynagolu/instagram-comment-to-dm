@@ -21,7 +21,9 @@ export function proxy(request: NextRequest) {
 
   if (isProtected && !isAuthenticated) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    // Keep the query too, so a pricing link like /settings?plan=PRO&billing=yearly
+    // lands back on the same choice after sign-in.
+    loginUrl.searchParams.set("callbackUrl", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 

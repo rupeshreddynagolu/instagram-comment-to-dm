@@ -3,11 +3,13 @@ import { z } from "zod";
 import { requireEnv } from "@/lib/env";
 import { prisma } from "@/lib/db/client";
 import { billingProviderError } from "@/lib/billing/errors";
-import { hasPaidAccess } from "@/lib/billing/plans";
+import { hasPaidAccess, razorpayPlanEnvName } from "@/lib/billing/plans";
 import {
   cancelRazorpaySubscription,
   createRazorpaySubscription,
   isRazorpayConfigured,
+  isRazorpayYearlyConfigured,
+  SUBSCRIPTION_TOTAL_COUNT,
 } from "@/lib/razorpay";
 import {
   canManageBilling,
@@ -16,6 +18,7 @@ import {
 
 const checkoutSchema = z.object({
   plan: z.enum(["PRO", "AGENCY"]),
+  interval: z.enum(["MONTHLY", "YEARLY"]).default("MONTHLY"),
 });
 
 export async function POST(request: NextRequest) {
@@ -46,6 +49,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { success: false, error: "Invalid checkout plan" },
       { status: 400 }
+    );
+  }
+
+  const { plan, interval } = parsed.data;
+  if (interval === "YEARLY" && !isRazorpayYearlyConfigured()) {
+    return NextResponse.json(
+      { success: false, error: "Yearly billing is not available yet. Choose monthly." },
+      { status: 503 }
     );
   }
 
@@ -86,18 +97,15 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const planId =
-    parsed.data.plan === "AGENCY"
-      ? requireEnv("RAZORPAY_PLAN_AGENCY")
-      : requireEnv("RAZORPAY_PLAN_PRO");
-
   let subscription;
   try {
     subscription = await createRazorpaySubscription({
-      planId,
+      planId: requireEnv(razorpayPlanEnvName(plan, interval)),
+      totalCount: SUBSCRIPTION_TOTAL_COUNT[interval],
       notes: {
         workspaceId: context.workspaceId,
-        plan: parsed.data.plan,
+        plan,
+        interval,
       },
     });
   } catch (error) {

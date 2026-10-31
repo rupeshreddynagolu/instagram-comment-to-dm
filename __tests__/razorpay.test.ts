@@ -103,6 +103,18 @@ describe("Razorpay mapping", () => {
     expect(getPlanForRazorpayPlanId("plan_unknown")).toBe("FREE");
     expect(getPlanForRazorpayPlanId(null)).toBe("FREE");
   });
+
+  it("maps yearly Razorpay plan IDs to the same plans", () => {
+    vi.stubEnv("RAZORPAY_PLAN_PRO_YEARLY", "plan_pro_yearly");
+    vi.stubEnv("RAZORPAY_PLAN_AGENCY_YEARLY", "plan_agency_yearly");
+    expect(getPlanForRazorpayPlanId("plan_pro_yearly")).toBe("PRO");
+    expect(getPlanForRazorpayPlanId("plan_agency_yearly")).toBe("AGENCY");
+  });
+
+  it("never matches an unset yearly plan against an empty plan ID", () => {
+    vi.stubEnv("RAZORPAY_PLAN_PRO_YEARLY", "");
+    expect(getPlanForRazorpayPlanId("")).toBe("FREE");
+  });
 });
 
 describe("syncRazorpaySubscription", () => {

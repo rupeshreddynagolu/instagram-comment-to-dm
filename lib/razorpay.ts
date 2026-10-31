@@ -3,9 +3,9 @@ import { requireEnv } from "@/lib/env";
 
 const RAZORPAY_API_BASE = "https://api.razorpay.com/v1";
 
-// Monthly cycles the subscription runs for. Razorpay requires a finite count;
-// ten years is effectively "until cancelled".
-const SUBSCRIPTION_TOTAL_COUNT = 120;
+// Billing cycles a subscription runs for. Razorpay requires a finite count;
+// ten years is effectively "until cancelled", in months or in years.
+export const SUBSCRIPTION_TOTAL_COUNT = { MONTHLY: 120, YEARLY: 10 } as const;
 
 export type RazorpaySubscriptionStatus =
   | "created"
@@ -49,6 +49,15 @@ export function isRazorpayConfigured(): boolean {
   );
 }
 
+/** Yearly billing needs its own Razorpay plan for each paid tier. */
+export function isRazorpayYearlyConfigured(): boolean {
+  return Boolean(
+    isRazorpayConfigured() &&
+      process.env.RAZORPAY_PLAN_PRO_YEARLY &&
+      process.env.RAZORPAY_PLAN_AGENCY_YEARLY
+  );
+}
+
 async function razorpayRequest<T>(
   path: string,
   init: { method: "GET" | "POST"; body?: unknown }
@@ -78,13 +87,14 @@ async function razorpayRequest<T>(
 
 export function createRazorpaySubscription(input: {
   planId: string;
+  totalCount: number;
   notes: Record<string, string>;
 }): Promise<RazorpaySubscription> {
   return razorpayRequest<RazorpaySubscription>("/subscriptions", {
     method: "POST",
     body: {
       plan_id: input.planId,
-      total_count: SUBSCRIPTION_TOTAL_COUNT,
+      total_count: input.totalCount,
       customer_notify: true,
       notes: input.notes,
     },
