@@ -3,66 +3,71 @@ import { isIP } from "node:net";
 // Fixed-window counters, kept in memory like the sign-in lockout: per
 // process, so a few workers on cPanel each keep their own count. Enough to
 // stop an inbox being flooded or an email list being run through sign-in.
-const windows = new Map<string, { count: number; limit: number; expires: number }>();
+type Window = { count: number; expires: number };
+// Counters still under their limit, oldest first, and counters at their
+// limit (blocking someone) kept apart, so room can be made in one step.
+const open = new Map<string, Window>();
+const blocked = new Map<string, Window>();
 // Ended windows are cleared at most once a minute, and only once there are
-// many keys. Past MAX_KEYS, room is made by dropping the oldest counter that
-// isn't blocking anyone: a counter at its limit is never dropped (that would
-// lift someone's block), and a flood of new keys can't lock everyone out,
-// since its own keys are the first to go. Only if every counter is blocking
-// is a new key refused.
+// many keys. Past MAX_KEYS, the oldest open counter is dropped: a blocking
+// counter never is (that would lift someone's block), and a flood of new keys
+// can't lock everyone out, since its own keys are the first to go. Only if
+// every counter is blocking is a new key refused.
 const PRUNE_AT = 10_000;
 const MAX_KEYS = 50_000;
 const PRUNE_EVERY_MS = 60_000;
 let lastPrune = 0;
 
+const size = () => open.size + blocked.size;
+
 function prune(now: number) {
-  if (windows.size < PRUNE_AT || now - lastPrune < PRUNE_EVERY_MS) return;
+  if (size() < PRUNE_AT || now - lastPrune < PRUNE_EVERY_MS) return;
   lastPrune = now;
-  for (const [key, entry] of windows) {
-    if (entry.expires <= now) windows.delete(key);
-  }
-}
-
-// How many of the oldest counters makeRoom looks at, so a full store can't
-// make every new key cost a scan of all of them.
-const ROOM_SCAN = 100;
-
-/** Drops one of the oldest counters below its limit; false if none of them is. */
-function makeRoom(now: number): boolean {
-  // A Map iterates in insertion order, so the first keys are the oldest.
-  let scanned = 0;
-  for (const [key, entry] of windows) {
-    if (++scanned > ROOM_SCAN) break;
-    if (entry.expires <= now || entry.count < entry.limit) {
-      windows.delete(key);
-      return true;
+  for (const store of [open, blocked]) {
+    for (const [key, entry] of store) {
+      if (entry.expires <= now) store.delete(key);
     }
   }
-  return false;
 }
 
 /** Counts one use of `key`; false once it has been used `limit` times in the window. */
 export function take(key: string, limit: number, windowMs: number, now: number = Date.now()): boolean {
-  const entry = windows.get(key);
-  if (!entry || entry.expires <= now) {
-    windows.delete(key);
+  const live = (entry: Window | undefined) => (entry && entry.expires > now ? entry : undefined);
+  if (live(blocked.get(key))) return false;
+  const entry = live(open.get(key));
+
+  if (!entry) {
+    open.delete(key);
+    blocked.delete(key);
     prune(now);
-    if (windows.size >= MAX_KEYS && !makeRoom(now)) return false;
-    windows.set(key, { count: 1, limit, expires: now + windowMs });
+    if (size() >= MAX_KEYS) {
+      // A Map iterates in insertion order, so the first open key is the oldest.
+      const oldest = open.keys().next();
+      if (oldest.done) return false;
+      open.delete(oldest.value);
+    }
+    const fresh = { count: 1, expires: now + windowMs };
+    if (fresh.count >= limit) blocked.set(key, fresh);
+    else open.set(key, fresh);
     return true;
   }
-  if (entry.count >= limit) return false;
+
   entry.count += 1;
+  if (entry.count >= limit) {
+    open.delete(key);
+    blocked.set(key, entry);
+  }
   return true;
 }
 
 export function resetThrottleForTests() {
-  windows.clear();
+  open.clear();
+  blocked.clear();
   lastPrune = 0;
 }
 
 export function throttleSizeForTests(): number {
-  return windows.size;
+  return size();
 }
 
 // A plain addr-spec in ASCII: the local part's allowed characters, then

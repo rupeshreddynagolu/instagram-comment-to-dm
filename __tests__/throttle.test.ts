@@ -102,7 +102,14 @@ describe("take, under load", () => {
     expect(take("someone-new", 3, 3_600_000, 1)).toBe(true);
   });
 
-  it("refuses a new key when the oldest counters are all blocking", () => {
+  it("still takes new keys when the oldest counters are blocking but newer ones aren't", () => {
+    for (let i = 0; i < 1_000; i++) take(`blocked-${i}`, 1, 3_600_000, 0);
+    for (let i = 0; i < 49_000; i++) take(`open-${i}`, 3, 3_600_000, 0);
+    expect(take("someone-new", 3, 3_600_000, 1)).toBe(true);
+    expect(take("blocked-0", 1, 3_600_000, 1)).toBe(false);
+  });
+
+  it("refuses a new key only when every counter is blocking", () => {
     for (let i = 0; i < 50_000; i++) take(`blocked-${i}`, 1, 3_600_000, 0);
     expect(take("someone-new", 1, 3_600_000, 1)).toBe(false);
   });
