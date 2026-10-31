@@ -20,6 +20,18 @@ export const metadata: Metadata = {
   ],
 };
 
+// Each card's place in the bento, in library order.
+const bento: { size: "wide" | "tall" | "regular"; span: string }[] = [
+  { size: "wide", span: "md:col-span-2 lg:col-span-4" },
+  { size: "tall", span: "lg:col-span-2 lg:row-span-2" },
+  { size: "regular", span: "lg:col-span-2" },
+  { size: "regular", span: "lg:col-span-2" },
+  { size: "regular", span: "lg:col-span-2" },
+  { size: "regular", span: "lg:col-span-2" },
+  { size: "regular", span: "lg:col-span-2" },
+  { size: "wide", span: "md:col-span-2 lg:col-span-6" },
+];
+
 export default function TemplatesPage() {
   // Three different kinds of campaign for the deck in the hero.
   const deck = ["event-rsvp", "fitness-plan", "dtc-product-link"]
@@ -65,12 +77,17 @@ export default function TemplatesPage() {
           label={`${CAMPAIGN_TEMPLATES.length} templates`}
           title="Pick the one closest to your campaign"
         />
-        <Reveal stagger as="ul" className="mt-12 grid gap-4 md:grid-cols-2">
-          {CAMPAIGN_TEMPLATES.map((template) => (
-            <li key={template.slug}>
-              <TemplateCard template={template} />
-            </li>
-          ))}
+        {/* A bento: a wide card, a tall one beside it, compact cards between,
+            and a wide card to close. Two columns on tablets, one on phones. */}
+        <Reveal stagger as="ul" className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+          {CAMPAIGN_TEMPLATES.map((template, index) => {
+            const { size, span } = bento[index % bento.length];
+            return (
+              <li key={template.slug} className={span}>
+                <TemplateCard template={template} size={size} />
+              </li>
+            );
+          })}
         </Reveal>
       </section>
     </SiteShell>
