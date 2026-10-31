@@ -48,6 +48,22 @@ describe("clientKey", () => {
     expect(key("2001:0db8:00aa:00bb::9")).toBe("ip:2001:db8:aa:bb::/64");
     expect(key("2001:db8::1")).toBe("ip:2001:db8:0:0::/64");
   });
+
+  it("reads IPv4 written as IPv6, ports, brackets and zones as one address", () => {
+    const key = (ip: string) => clientKey(new Headers({ "x-real-ip": ip }));
+    expect(key("::ffff:203.0.113.9")).toBe("ip:203.0.113.9");
+    expect(key("::203.0.113.9")).toBe("ip:203.0.113.9");
+    expect(key("203.0.113.9:51234")).toBe("ip:203.0.113.9");
+    expect(key("[2001:db8:aa:bb::9]:443")).toBe("ip:2001:db8:aa:bb::/64");
+    expect(key("fe80::1%eth0")).toBe("ip:fe80:0:0:0::/64");
+  });
+
+  it("counts anything that isn't an address as unknown", () => {
+    const key = (ip: string) => clientKey(new Headers({ "x-real-ip": ip }));
+    expect(key("not-an-ip")).toBe("ip:unknown");
+    expect(key("999.1.1.1")).toBe("ip:unknown");
+    expect(key("1:2:3:4:5:6:7:8:9")).toBe("ip:unknown");
+  });
 });
 
 describe("plainEmail", () => {
@@ -86,7 +102,7 @@ describe("take, under load", () => {
     expect(take("someone-new", 3, 3_600_000, 1)).toBe(true);
   });
 
-  it("refuses a new key only when every counter is blocking", () => {
+  it("refuses a new key when the oldest counters are all blocking", () => {
     for (let i = 0; i < 50_000; i++) take(`blocked-${i}`, 1, 3_600_000, 0);
     expect(take("someone-new", 1, 3_600_000, 1)).toBe(false);
   });

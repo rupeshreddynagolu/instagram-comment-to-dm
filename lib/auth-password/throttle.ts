@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 // Fixed-window counters, kept in memory like the sign-in lockout: per
 // process, so a few workers on cPanel each keep their own count. Enough to
 // stop an inbox being flooded or an email list being run through sign-in.
@@ -21,10 +23,16 @@ function prune(now: number) {
   }
 }
 
-/** Drops the oldest counter below its limit; false if every counter is at its limit. */
+// How many of the oldest counters makeRoom looks at, so a full store can't
+// make every new key cost a scan of all of them.
+const ROOM_SCAN = 100;
+
+/** Drops one of the oldest counters below its limit; false if none of them is. */
 function makeRoom(now: number): boolean {
   // A Map iterates in insertion order, so the first keys are the oldest.
+  let scanned = 0;
   for (const [key, entry] of windows) {
+    if (++scanned > ROOM_SCAN) break;
     if (entry.expires <= now || entry.count < entry.limit) {
       windows.delete(key);
       return true;
@@ -87,20 +95,39 @@ export function plainEmail(raw: string): string | null {
  */
 export function clientKey(headers: Headers): string {
   const forwarded = headers.get("x-forwarded-for")?.split(",").at(-1)?.trim();
-  const address = forwarded || headers.get("x-real-ip")?.trim() || "unknown";
-  return `ip:${address.includes(":") ? ipv6Network(address) : address}`;
+  return `ip:${clientAddress(forwarded || headers.get("x-real-ip")?.trim() || "")}`;
 }
 
 /**
- * An IPv6 address's /64 network: one home or phone usually gets a whole /64,
- * so counting single addresses would hand it billions of fresh budgets.
+ * The address to count against: IPv4 as is (also when written as IPv6,
+ * ::ffff:1.2.3.4), and IPv6 by its /64 network, since one home or phone
+ * usually gets a whole /64. Brackets, ports and zone IDs are dropped first;
+ * anything that still isn't an address counts as "unknown".
  */
+function clientAddress(raw: string): string {
+  let address = raw.toLowerCase();
+  const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(address);
+  if (bracketed) address = bracketed[1];
+  else if (/^[\d.]+:\d+$/.test(address)) address = address.slice(0, address.lastIndexOf(":"));
+  address = address.split("%")[0];
+
+  const mapped = /^(?:0{0,4}:){0,5}(?:ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/.exec(address.replace(/^::/, "0:"));
+  if (address.includes(":") && mapped && isIP(mapped[1]) === 4) return mapped[1];
+
+  switch (isIP(address)) {
+    case 4:
+      return address;
+    case 6:
+      return ipv6Network(address);
+    default:
+      return "unknown";
+  }
+}
+
 function ipv6Network(address: string): string {
-  const [head, tail = ""] = address.toLowerCase().split("::");
+  const [head, tail] = address.split("::");
   const front = head ? head.split(":") : [];
-  const back = address.includes("::") && tail ? tail.split(":") : [];
-  const groups = address.includes("::")
-    ? [...front, ...Array(Math.max(0, 8 - front.length - back.length)).fill("0"), ...back]
-    : front;
+  const back = tail ? tail.split(":") : [];
+  const groups = tail === undefined ? front : [...front, ...Array(8 - front.length - back.length).fill("0"), ...back];
   return `${groups.slice(0, 4).map((group) => group.replace(/^0+(?=.)/, "")).join(":")}::/64`;
 }
