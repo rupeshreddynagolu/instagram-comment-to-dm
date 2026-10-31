@@ -1,11 +1,16 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { EMAIL_PROVIDER_ID, signIn } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { authenticateWithPassword } from "@/lib/auth-password/authenticate";
 import { safeCallbackPath } from "@/lib/auth-password/callback";
 import { startSession } from "@/lib/auth-password/session";
+import { clientKey, take } from "@/lib/auth-password/throttle";
+
+const WINDOW_MS = 15 * 60 * 1000;
+const tooManyTries = "Too many tries. Wait a few minutes and try again.";
 
 export interface PasswordFormState {
   error: string | null;
@@ -36,6 +41,10 @@ export async function continueWithEmail(
 ): Promise<EmailStepState> {
   const email = String(formData.get("email") ?? "").trim();
   if (!email) return { step: "email", email, error: "Enter your email." };
+  // This step says whether an account exists, so a client only gets so many.
+  if (!take(`lookup:${clientKey(await headers())}`, 30, WINDOW_MS)) {
+    return { step: "email", email, error: tooManyTries };
+  }
 
   const user = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },
@@ -71,6 +80,12 @@ const sendFailed = "We couldn't send an email to that address. Check it and try 
  */
 async function emailSignInLink(formData: FormData, resetting: boolean): Promise<string> {
   const email = String(formData.get("email") ?? "").trim();
+  // A few links per address, so nobody can flood someone else's inbox, and a
+  // few more per client across addresses.
+  if (!take(`link:${email.toLowerCase()}`, 3, WINDOW_MS)) {
+    return "We've already sent links to this email. Check your inbox and spam, or wait 15 minutes.";
+  }
+  if (!take(`link-${clientKey(await headers())}`, 10, WINDOW_MS)) return tooManyTries;
   const callback = safeCallbackPath(String(formData.get("callbackUrl") ?? ""));
   const user = email
     ? await prisma.user.findUnique({
