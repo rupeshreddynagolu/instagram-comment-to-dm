@@ -40,6 +40,16 @@ describe("proxy", () => {
     expect(location(res)).toBe("/dashboard");
   });
 
+  it("never follows a backslash or absolute callbackUrl off-site", () => {
+    for (const bad of ["/\\evil.example/x", "https://evil.example/x", "/%5Cevil.example"]) {
+      const res = proxy(
+        request(`http://localhost/login?callbackUrl=${encodeURIComponent(bad)}`, true)
+      );
+      const target = new URL(res.headers.get("location")!);
+      expect(target.origin).toBe("http://localhost");
+    }
+  });
+
   it("ignores a template slug that isn't a slug", () => {
     const res = proxy(request("http://localhost/login?template=..%2F..%2Fadmin", true));
     expect(location(res)).toBe("/dashboard");

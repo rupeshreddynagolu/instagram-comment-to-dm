@@ -16,15 +16,24 @@ function hasSessionCookie(request: NextRequest): boolean {
  * the campaign builder for a "Use this template" link, a same-site
  * callbackUrl, or the dashboard.
  */
-function signedInDestination(params: URLSearchParams): string {
+function signedInDestination(request: NextRequest): string {
+  const params = request.nextUrl.searchParams;
   const template = params.get("template");
   if (template && /^[a-z0-9-]+$/.test(template)) {
     return `/campaigns/new?template=${template}`;
   }
   const callbackUrl = params.get("callbackUrl");
-  // A path on this site only: "/x" yes, "//other.site" or "https://…" no.
-  if (callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")) {
-    return callbackUrl;
+  if (callbackUrl) {
+    // Resolve it the way the browser will, then check where it really points:
+    // "//other.site", "/\other.site" and "https://…" all leave this origin.
+    try {
+      const target = new URL(callbackUrl, request.url);
+      if (target.origin === request.nextUrl.origin) {
+        return target.pathname + target.search + target.hash;
+      }
+    } catch {
+      // Not a URL at all; fall through to the dashboard.
+    }
   }
   return "/dashboard";
 }
@@ -47,7 +56,7 @@ export function proxy(request: NextRequest) {
 
   if (isLogin && isAuthenticated) {
     return NextResponse.redirect(
-      new URL(signedInDestination(request.nextUrl.searchParams), request.url)
+      new URL(signedInDestination(request), request.url)
     );
   }
 
