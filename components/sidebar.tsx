@@ -138,7 +138,7 @@ export default function Sidebar({
         {/* Bottom section */}
         <div className="px-4 py-4 border-t border-border">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-xs font-bold text-white">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-site-reply to-site-marker flex items-center justify-center text-xs font-bold text-site-ink">
               CC
             </div>
             <div className="flex-1 min-w-0">

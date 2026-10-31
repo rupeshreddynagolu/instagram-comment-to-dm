@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 import type { AccountOption } from "@/components/account-select";
+import type { BillingInterval } from "@/lib/billing/plans";
+import {
+  formatInr,
+  PLAN_PRICES_INR,
+  YEARLY_DISCOUNT_PERCENT,
+} from "@/lib/billing/pricing";
 
 interface SettingsData {
   workspace: {
@@ -17,6 +23,7 @@ interface SettingsData {
   billingProviders: {
     stripe: boolean;
     razorpay: boolean;
+    razorpayYearly: boolean;
   };
   instagramAccount: {
     id: string;
@@ -93,6 +100,21 @@ export default function SettingsPage() {
   const [inviteRole, setInviteRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
   const [memberError, setMemberError] = useState<string | null>(null);
   const [billingMessage, setBillingMessage] = useState<string | null>(null);
+  // A pricing-page link (?plan=PRO&billing=yearly) preselects the period and
+  // highlights the plan the visitor picked.
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>("MONTHLY");
+  const [pickedPlan, setPickedPlan] = useState<"PRO" | "AGENCY" | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the link that opened the page
+    if (params.get("billing") === "yearly") setBillingInterval("YEARLY");
+    const plan = params.get("plan");
+    if (plan === "PRO" || plan === "AGENCY") {
+      setPickedPlan(plan);
+      document.getElementById("billing")?.scrollIntoView({ block: "start" });
+    }
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -175,7 +197,15 @@ export default function SettingsPage() {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify(
+          provider === "razorpay"
+            ? {
+                plan,
+                // Until the yearly plans exist, a yearly link falls back to monthly.
+                interval: data?.billingProviders.razorpayYearly ? billingInterval : "MONTHLY",
+              }
+            : { plan }
+        ),
       }
     );
     const payload = await readPayload(res);
@@ -324,7 +354,7 @@ export default function SettingsPage() {
         <div className="mt-6 pt-4 border-t border-border flex gap-3">
           <a
             href="/api/instagram/connect"
-            className="px-4 py-2 rounded-xl text-sm font-medium transition-colors bg-accent text-white hover:bg-accent-hover"
+            className="px-4 py-2 rounded-xl text-sm font-medium transition-colors bg-accent text-site-ink hover:bg-accent-hover"
           >
             {accounts.length > 0 ? "Connect another account" : "Connect Instagram"}
           </a>
@@ -434,7 +464,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={busy === "invite"}
-              className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+              className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-site-ink transition-colors hover:bg-accent-hover disabled:opacity-50"
             >
               {busy === "invite" ? "Inviting..." : "Invite"}
             </button>
@@ -445,10 +475,10 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section className="glass rounded-2xl p-6">
+      <section id="billing" className="glass scroll-mt-24 rounded-2xl p-6">
         <h2 className="text-base font-semibold mb-6">Billing</h2>
 
-        <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-500/10 to-violet-500/10 border border-accent/15">
+        <div className="p-4 rounded-xl bg-gradient-to-r from-site-reply/10 to-site-marker/10 border border-accent/15">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-foreground">
@@ -496,14 +526,45 @@ export default function SettingsPage() {
           <p className="mt-3 text-xs text-muted">{billingMessage}</p>
         )}
 
+        {!isPaid && data?.billingProviders.razorpayYearly && (
+          <div className="mt-4 flex items-center gap-3">
+            <div role="radiogroup" aria-label="Billing period" className="inline-flex rounded-xl border border-border bg-surface p-1">
+              {(["MONTHLY", "YEARLY"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={billingInterval === option}
+                  onClick={() => setBillingInterval(option)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    billingInterval === option
+                      ? "bg-accent text-site-ink"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  {option === "MONTHLY" ? "Monthly" : "Yearly"}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-muted">Save {YEARLY_DISCOUNT_PERCENT}% with yearly</span>
+          </div>
+        )}
+
         <div className="mt-4 space-y-3">
           {[
             { plan: "PRO" as const, price: "$19/mo", features: "10 campaigns · 2,000 DMs/month" },
             { plan: "AGENCY" as const, price: "$49/mo", features: "Unlimited campaigns · 10 accounts · 10,000 DMs/month" },
-          ].map((tier) => (
+          ].map((tier) => {
+            const yearly = billingInterval === "YEARLY" && Boolean(data?.billingProviders.razorpayYearly);
+            const inrPrice = yearly
+              ? `${formatInr(PLAN_PRICES_INR[tier.plan].YEARLY)}/yr`
+              : `${formatInr(PLAN_PRICES_INR[tier.plan].MONTHLY)}/mo`;
+            return (
             <div
               key={tier.plan}
-              className="flex items-center justify-between py-3 border-b border-border last:border-0"
+              className={`flex items-center justify-between py-3 border-b border-border last:border-0 ${
+                pickedPlan === tier.plan && !isPaid ? "-mx-3 rounded-xl px-3 ring-1 ring-accent/40" : ""
+              }`}
             >
               <div>
                 <p className="text-sm font-medium text-foreground">{tier.plan}</p>
@@ -529,14 +590,15 @@ export default function SettingsPage() {
                       disabled={busy !== null}
                       className="px-4 py-2 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:border-border-hover transition-colors disabled:opacity-50"
                     >
-                      {busy === `razorpay:${tier.plan}` ? "Opening..." : "INR · UPI"}
+                      {busy === `razorpay:${tier.plan}` ? "Opening..." : `${inrPrice} · UPI`}
                     </button>
                   )}
-                  {data?.billingProviders.stripe && (
+                  {/* Stripe only has monthly prices. */}
+                  {data?.billingProviders.stripe && !yearly && (
                     <button
                       onClick={() => startCheckout(tier.plan, "stripe")}
                       disabled={busy !== null}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
+                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-site-ink hover:bg-accent-hover transition-colors disabled:opacity-50"
                     >
                       {busy === `stripe:${tier.plan}` ? "Opening..." : `${tier.price} · card`}
                     </button>
@@ -544,7 +606,8 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>

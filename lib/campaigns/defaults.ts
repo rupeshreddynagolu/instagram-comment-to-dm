@@ -16,4 +16,4 @@ export const CAMPAIGN_GOALS = [
 ] as const;
 
 export const DEFAULT_FOLLOW_UP =
-  "btw just wanted to say thanks, i really appreciate the support 🙌";
+  "btw just wanted to say thanks, i really appreciate the support";
