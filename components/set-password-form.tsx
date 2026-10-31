@@ -7,7 +7,16 @@ const field =
   "w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20";
 
 /** New password twice, with a show/hide toggle; the action does the checks. */
-export default function SetPasswordForm({ next, hasPassword }: { next: string; hasPassword: boolean }) {
+export default function SetPasswordForm({
+  next,
+  hasPassword,
+  needsCurrent,
+}: {
+  next: string;
+  hasPassword: boolean;
+  /** Ask for the current password (no recent email-link sign-in). */
+  needsCurrent: boolean;
+}) {
   const [state, action, pending] = useActionState<SetPasswordState, FormData>(setPassword, {
     error: null,
   });
@@ -17,6 +26,14 @@ export default function SetPasswordForm({ next, hasPassword }: { next: string; h
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
+      {needsCurrent && (
+        <div className="space-y-1.5">
+          <label htmlFor="current" className="block text-sm font-medium text-foreground">
+            Current password
+          </label>
+          <input id="current" name="current" type={type} required autoComplete="current-password" className={field} />
+        </div>
+      )}
       <div className="space-y-1.5">
         <label htmlFor="password" className="block text-sm font-medium text-foreground">
           {hasPassword ? "New password" : "Password"}

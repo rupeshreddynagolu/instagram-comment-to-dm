@@ -14,7 +14,8 @@ const { mockPrisma } = vi.hoisted(() => ({
 vi.mock("@/lib/db/client", () => ({ prisma: mockPrisma }));
 
 import { hashPassword, passwordProblem, verifyPassword } from "../lib/auth-password/hash";
-import { authenticateWithPassword, resetAttemptsForTests } from "../lib/auth-password/authenticate";
+import { mayChangeWithoutCurrentPassword } from "../lib/auth-password/reauth";
+import { authenticateWithPassword, resetAttemptsForTests, verifyCurrentPassword } from "../lib/auth-password/authenticate";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -86,6 +87,20 @@ describe("authenticateWithPassword", () => {
     });
   });
 
+  it("counts failures per account, so other spellings of the same email can't dodge the lock", async () => {
+    const passwordHash = await hashPassword("right password");
+    // MySQL's default collation finds the same row for these.
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "user_1", passwordHash, emailVerified: new Date() });
+    const spellings = ["a@example.com", "A@example.com", "á@example.com", "a@exámple.com", "a@example.com"];
+    for (const email of spellings) {
+      await authenticateWithPassword(email, "wrong password");
+    }
+    expect(await authenticateWithPassword("à@example.com", "right password")).toEqual({
+      ok: false,
+      reason: "locked",
+    });
+  });
+
   it("locks an email for a while after repeated failures, even with the right password", async () => {
     const passwordHash = await hashPassword("right password");
     mockPrisma.user.findUnique.mockResolvedValue({ id: "user_1", passwordHash, emailVerified: new Date() });
@@ -96,5 +111,35 @@ describe("authenticateWithPassword", () => {
       ok: false,
       reason: "locked",
     });
+  });
+});
+
+describe("mayChangeWithoutCurrentPassword", () => {
+  const now = new Date("2026-10-31T12:00:00Z");
+
+  it("lets someone with no password set one", () => {
+    expect(mayChangeWithoutCurrentPassword({ passwordHash: null, lastLinkSignInAt: null }, now)).toBe(true);
+  });
+
+  it("lets someone change it within 15 minutes of an email-link sign-in", () => {
+    const recent = new Date(now.getTime() - 10 * 60 * 1000);
+    expect(mayChangeWithoutCurrentPassword({ passwordHash: "scrypt$x", lastLinkSignInAt: recent }, now)).toBe(true);
+  });
+
+  it("asks for the current password otherwise", () => {
+    const old = new Date(now.getTime() - 20 * 60 * 1000);
+    expect(mayChangeWithoutCurrentPassword({ passwordHash: "scrypt$x", lastLinkSignInAt: old }, now)).toBe(false);
+    expect(mayChangeWithoutCurrentPassword({ passwordHash: "scrypt$x", lastLinkSignInAt: null }, now)).toBe(false);
+  });
+});
+
+describe("verifyCurrentPassword", () => {
+  it("accepts the right password and locks after repeated wrong ones", async () => {
+    const hash = await hashPassword("current password");
+    expect(await verifyCurrentPassword("user_9", hash, "current password")).toBe("ok");
+    for (let i = 0; i < 5; i++) {
+      expect(await verifyCurrentPassword("user_9", hash, "wrong guess")).toBe("invalid");
+    }
+    expect(await verifyCurrentPassword("user_9", hash, "current password")).toBe("locked");
   });
 });

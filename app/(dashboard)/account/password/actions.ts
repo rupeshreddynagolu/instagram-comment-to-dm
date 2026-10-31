@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { getCurrentUserId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { safeCallbackPath } from "@/lib/auth-password/callback";
+import { verifyCurrentPassword } from "@/lib/auth-password/authenticate";
 import { hashPassword, passwordProblem } from "@/lib/auth-password/hash";
+import { mayChangeWithoutCurrentPassword } from "@/lib/auth-password/reauth";
 import { endOtherSessions } from "@/lib/auth-password/session";
 
 export interface SetPasswordState {
@@ -14,8 +16,10 @@ export interface SetPasswordState {
 /**
  * Sets or changes the signed-in user's password. Only someone signed in can
  * reach this, and signing in means following an email link or knowing the
- * old password, so the email is already proven. Other sessions end, so a
- * changed password locks out anyone who had the old one.
+ * old password, so the email is already proven. Replacing an existing
+ * password also needs the current one, unless the user just came in by email
+ * link. Other sessions end, so a changed password locks out anyone who had
+ * the old one.
  */
 export async function setPassword(
   _previous: SetPasswordState,
@@ -23,6 +27,25 @@ export async function setPassword(
 ): Promise<SetPasswordState> {
   const userId = await getCurrentUserId();
   if (!userId) redirect("/login");
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true, lastLinkSignInAt: true },
+  });
+  if (!user) redirect("/login");
+
+  // An open session isn't enough to replace an existing password: the old
+  // password, or a fresh email-link sign-in, has to back it up.
+  if (!mayChangeWithoutCurrentPassword(user)) {
+    const current = String(formData.get("current") ?? "");
+    const check = await verifyCurrentPassword(userId, user.passwordHash, current);
+    if (check === "locked") {
+      return { error: "Too many tries. Wait 15 minutes, or sign out and use \"Forgot password?\"." };
+    }
+    if (check === "invalid") {
+      return { error: "Your current password isn't right. Forgot it? Sign out and use \"Forgot password?\"." };
+    }
+  }
 
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
