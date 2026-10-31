@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/automations", "/logs", "/settings"];
+const PROTECTED_PREFIXES = ["/dashboard", "/automations", "/campaigns", "/logs", "/settings"];
 
 function hasSessionCookie(request: NextRequest): boolean {
   return (
@@ -9,6 +9,24 @@ function hasSessionCookie(request: NextRequest): boolean {
     request.cookies.has("next-auth.session-token") ||
     request.cookies.has("__Secure-next-auth.session-token")
   );
+}
+
+/**
+ * Where a visitor who is already signed in should go instead of /login:
+ * the campaign builder for a "Use this template" link, a same-site
+ * callbackUrl, or the dashboard.
+ */
+function signedInDestination(params: URLSearchParams): string {
+  const template = params.get("template");
+  if (template && /^[a-z0-9-]+$/.test(template)) {
+    return `/campaigns/new?template=${template}`;
+  }
+  const callbackUrl = params.get("callbackUrl");
+  // A path on this site only: "/x" yes, "//other.site" or "https://…" no.
+  if (callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")) {
+    return callbackUrl;
+  }
+  return "/dashboard";
 }
 
 export function proxy(request: NextRequest) {
@@ -28,7 +46,9 @@ export function proxy(request: NextRequest) {
   }
 
   if (isLogin && isAuthenticated) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(
+      new URL(signedInDestination(request.nextUrl.searchParams), request.url)
+    );
   }
 
   return NextResponse.next();
@@ -38,6 +58,7 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/automations/:path*",
+    "/campaigns/:path*",
     "/logs/:path*",
     "/settings/:path*",
     "/login",
