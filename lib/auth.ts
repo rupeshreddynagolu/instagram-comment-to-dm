@@ -38,13 +38,6 @@ export const authConfig = {
     },
   },
   events: {
-    // Email-link sign-ins are what prove the email, so they open a short
-    // window to change a password without the old one ("Forgot password?").
-    async signIn({ user, account }) {
-      if (account?.type === "email" && user.id) {
-        await prisma.user.update({ where: { id: user.id }, data: { lastLinkSignInAt: new Date() } });
-      }
-    },
     async createUser({ user }) {
       if (user.id) {
         await ensureWorkspaceForUser(user.id, user.email);

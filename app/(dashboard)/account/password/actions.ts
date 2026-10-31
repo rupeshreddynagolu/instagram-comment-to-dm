@@ -7,7 +7,7 @@ import { safeCallbackPath } from "@/lib/auth-password/callback";
 import { verifyCurrentPassword } from "@/lib/auth-password/authenticate";
 import { hashPassword, passwordProblem } from "@/lib/auth-password/hash";
 import { mayChangeWithoutCurrentPassword } from "@/lib/auth-password/reauth";
-import { endOtherSessions } from "@/lib/auth-password/session";
+import { currentSession, endOtherSessions } from "@/lib/auth-password/session";
 
 export interface SetPasswordState {
   error: string | null;
@@ -17,8 +17,8 @@ export interface SetPasswordState {
  * Sets or changes the signed-in user's password. Only someone signed in can
  * reach this, and signing in means following an email link or knowing the
  * old password, so the email is already proven. Replacing an existing
- * password also needs the current one, unless the user just came in by email
- * link. Other sessions end, so a changed password locks out anyone who had
+ * password also needs the current one, unless this session was started by an
+ * email link in the last 15 minutes. Other sessions end, so a changed password locks out anyone who had
  * the old one.
  */
 export async function setPassword(
@@ -30,13 +30,14 @@ export async function setPassword(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { passwordHash: true, lastLinkSignInAt: true },
+    select: { passwordHash: true },
   });
   if (!user) redirect("/login");
+  const session = await currentSession();
 
   // An open session isn't enough to replace an existing password: the old
   // password, or a fresh email-link sign-in, has to back it up.
-  if (!mayChangeWithoutCurrentPassword(user)) {
+  if (!mayChangeWithoutCurrentPassword(user, session)) {
     const current = String(formData.get("current") ?? "");
     const check = await verifyCurrentPassword(userId, user.passwordHash, current);
     if (check === "locked") {
@@ -60,6 +61,8 @@ export async function setPassword(
     data: { passwordHash: await hashPassword(password), emailVerified: new Date() },
   });
   await endOtherSessions(userId);
+  // The link's window is used up: a later change needs the new password.
+  if (session) await prisma.session.update({ where: { id: session.id }, data: { createdAt: null } });
 
   redirect(safeCallbackPath(String(formData.get("next") ?? ""), "/dashboard"));
 }

@@ -29,7 +29,7 @@ export async function sessionCookieName(): Promise<string> {
 export async function startSession(userId: string): Promise<void> {
   const sessionToken = randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + SESSION_SECONDS * 1000);
-  await prisma.session.create({ data: { sessionToken, userId, expires } });
+  await prisma.session.create({ data: { sessionToken, userId, expires, viaPassword: true } });
 
   const secure = await isSecure();
   (await cookies()).set(secure ? `__Secure-${COOKIE}` : COOKIE, sessionToken, {
@@ -38,6 +38,16 @@ export async function startSession(userId: string): Promise<void> {
     path: "/",
     secure,
     expires,
+  });
+}
+
+/** This request's session row, or null. */
+export async function currentSession() {
+  const token = (await cookies()).get(await sessionCookieName())?.value;
+  if (!token) return null;
+  return prisma.session.findUnique({
+    where: { sessionToken: token },
+    select: { id: true, createdAt: true, viaPassword: true },
   });
 }
 

@@ -101,6 +101,14 @@ describe("authenticateWithPassword", () => {
     });
   });
 
+  it("locks spellings of an unknown email together too, so the lock doesn't reveal which accounts exist", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    for (const email of ["x@example.com", "X@example.com", "ẋ@example.com", "x@exämple.com", "x@example.com"]) {
+      await authenticateWithPassword(email, "wrong password");
+    }
+    expect(await authenticateWithPassword("x@EXAMPLE.com", "any password")).toEqual({ ok: false, reason: "locked" });
+  });
+
   it("locks an email for a while after repeated failures, even with the right password", async () => {
     const passwordHash = await hashPassword("right password");
     mockPrisma.user.findUnique.mockResolvedValue({ id: "user_1", passwordHash, emailVerified: new Date() });
@@ -116,20 +124,23 @@ describe("authenticateWithPassword", () => {
 
 describe("mayChangeWithoutCurrentPassword", () => {
   const now = new Date("2026-10-31T12:00:00Z");
+  const minutesAgo = (m: number) => new Date(now.getTime() - m * 60 * 1000);
 
   it("lets someone with no password set one", () => {
-    expect(mayChangeWithoutCurrentPassword({ passwordHash: null, lastLinkSignInAt: null }, now)).toBe(true);
+    expect(mayChangeWithoutCurrentPassword({ passwordHash: null }, null, now)).toBe(true);
   });
 
-  it("lets someone change it within 15 minutes of an email-link sign-in", () => {
-    const recent = new Date(now.getTime() - 10 * 60 * 1000);
-    expect(mayChangeWithoutCurrentPassword({ passwordHash: "scrypt$x", lastLinkSignInAt: recent }, now)).toBe(true);
+  it("lets this session change it within 15 minutes of its own email-link sign-in", () => {
+    const session = { createdAt: minutesAgo(10), viaPassword: false };
+    expect(mayChangeWithoutCurrentPassword({ passwordHash: "scrypt$x" }, session, now)).toBe(true);
   });
 
-  it("asks for the current password otherwise", () => {
-    const old = new Date(now.getTime() - 20 * 60 * 1000);
-    expect(mayChangeWithoutCurrentPassword({ passwordHash: "scrypt$x", lastLinkSignInAt: old }, now)).toBe(false);
-    expect(mayChangeWithoutCurrentPassword({ passwordHash: "scrypt$x", lastLinkSignInAt: null }, now)).toBe(false);
+  it("asks an older session, a password session, or an unknown session for the current password", () => {
+    const user = { passwordHash: "scrypt$x" };
+    expect(mayChangeWithoutCurrentPassword(user, { createdAt: minutesAgo(20), viaPassword: false }, now)).toBe(false);
+    expect(mayChangeWithoutCurrentPassword(user, { createdAt: minutesAgo(1), viaPassword: true }, now)).toBe(false);
+    expect(mayChangeWithoutCurrentPassword(user, { createdAt: null, viaPassword: false }, now)).toBe(false);
+    expect(mayChangeWithoutCurrentPassword(user, null, now)).toBe(false);
   });
 });
 

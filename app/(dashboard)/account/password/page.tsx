@@ -4,6 +4,7 @@ import { getCurrentUserId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { safeCallbackPath } from "@/lib/auth-password/callback";
 import { mayChangeWithoutCurrentPassword } from "@/lib/auth-password/reauth";
+import { currentSession } from "@/lib/auth-password/session";
 
 export const metadata = { title: "Password - ReplyNxt" };
 
@@ -19,10 +20,10 @@ export default async function PasswordPage({
   const { next } = await searchParams;
   const userId = await getCurrentUserId();
   const user = userId
-    ? await prisma.user.findUnique({ where: { id: userId }, select: { email: true, passwordHash: true, lastLinkSignInAt: true } })
+    ? await prisma.user.findUnique({ where: { id: userId }, select: { email: true, passwordHash: true } })
     : null;
   const hasPassword = Boolean(user?.passwordHash);
-  const needsCurrent = user ? !mayChangeWithoutCurrentPassword(user) : false;
+  const needsCurrent = user ? !mayChangeWithoutCurrentPassword(user, await currentSession()) : false;
   const destination = safeCallbackPath(next, "/dashboard");
 
   return (

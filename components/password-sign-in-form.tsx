@@ -20,6 +20,9 @@ export default function PasswordSignInForm({
     error: null,
   });
   const [shown, setShown] = useState(false);
+  // Held here so it survives React resetting the form after a failed try;
+  // only the password should need typing again.
+  const [email, setEmail] = useState("");
 
   return (
     <form action={action} className="space-y-5">
@@ -36,6 +39,8 @@ export default function PasswordSignInForm({
           autoComplete="email"
           inputMode="email"
           placeholder="you@company.com"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
           className={field}
         />
       </div>

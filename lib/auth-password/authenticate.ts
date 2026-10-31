@@ -32,6 +32,11 @@ function recordFailure(key: string) {
   }
 }
 
+/** The email folded the way MySQL's case- and accent-insensitive collation folds it. */
+function lockKey(email: string): string {
+  return `email:${email.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase()}`;
+}
+
 export function resetAttemptsForTests() {
   failures.clear();
 }
@@ -53,10 +58,10 @@ export async function authenticateWithPassword(
       })
     : null;
 
-  // Failures count per account when there is one. MySQL matches emails
-  // ignoring case and accents, so counting by the typed address would give
-  // every spelling of the same email its own five tries.
-  const key = user ? `user:${user.id}` : `email:${email}`;
+  // Failures count by the email as MySQL matches it (ignoring case and
+  // accents), the same way whether or not an account exists: every spelling
+  // of one address shares one lock, and the lock reveals nothing.
+  const key = lockKey(email);
   if (isLocked(key)) return { ok: false, reason: "locked" };
 
   if (!user?.passwordHash) {
