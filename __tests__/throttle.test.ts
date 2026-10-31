@@ -70,11 +70,18 @@ describe("take, under load", () => {
     expect(throttleSizeForTests()).toBe(1);
   });
 
-  it("never holds more than its cap, dropping the oldest keys", () => {
-    for (let i = 0; i < 50_010; i++) take(`live-${i}`, 1, 3_600_000, 0);
-    expect(throttleSizeForTests()).toBeLessThanOrEqual(50_000);
-    // The newest key is still counted.
-    expect(take("live-50009", 1, 3_600_000, 1)).toBe(false);
+  it("refuses new keys when full, rather than dropping live counters", () => {
+    take("victim", 1, 3_600_000, 0);
+    for (let i = 0; i < 50_010; i++) take(`flood-${i}`, 1, 3_600_000, 0);
+    expect(throttleSizeForTests()).toBe(50_000);
+    // The victim's counter survived the flood, so its limit still holds.
+    expect(take("victim", 1, 3_600_000, 1)).toBe(false);
+    expect(take("someone-new", 1, 3_600_000, 1)).toBe(false);
+  });
+
+  it("makes room again once those windows have ended", () => {
+    for (let i = 0; i < 50_000; i++) take(`flood-${i}`, 1, 1_000, 0);
+    expect(take("later", 1, 1_000, 120_000)).toBe(true);
   });
 
   it("accepts ordinary addresses", () => {

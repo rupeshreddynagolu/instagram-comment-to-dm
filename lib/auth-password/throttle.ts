@@ -3,24 +3,19 @@
 // stop an inbox being flooded or an email list being run through sign-in.
 const windows = new Map<string, { count: number; expires: number }>();
 // Ended windows are cleared at most once a minute, and only once there are
-// many keys; past MAX_KEYS the oldest go, so memory stays bounded however
-// many keys arrive.
+// many keys. Live counters are never dropped to make room: that would let a
+// flood of new keys reset someone's limit. Past MAX_KEYS, new keys are
+// refused instead, until ended windows can be cleared.
 const PRUNE_AT = 10_000;
 const MAX_KEYS = 50_000;
 const PRUNE_EVERY_MS = 60_000;
 let lastPrune = 0;
 
 function prune(now: number) {
-  if (windows.size >= PRUNE_AT && now - lastPrune >= PRUNE_EVERY_MS) {
-    lastPrune = now;
-    for (const [key, entry] of windows) {
-      if (entry.expires <= now) windows.delete(key);
-    }
-  }
-  // A Map iterates in insertion order, so the first keys are the oldest.
-  for (const key of windows.keys()) {
-    if (windows.size < MAX_KEYS) break;
-    windows.delete(key);
+  if (windows.size < PRUNE_AT || now - lastPrune < PRUNE_EVERY_MS) return;
+  lastPrune = now;
+  for (const [key, entry] of windows) {
+    if (entry.expires <= now) windows.delete(key);
   }
 }
 
@@ -30,6 +25,7 @@ export function take(key: string, limit: number, windowMs: number, now: number =
   if (!entry || entry.expires <= now) {
     windows.delete(key);
     prune(now);
+    if (windows.size >= MAX_KEYS) return false;
     windows.set(key, { count: 1, expires: now + windowMs });
     return true;
   }
