@@ -10,28 +10,100 @@ interface MenuLink {
   description: string;
 }
 
-// One small line icon per section, keyed by the link's key.
-const icons: Record<string, string> = {
-  templates: "M4.5 4.5h6v6h-6v-6Zm9 0h6v6h-6v-6Zm-9 9h6v6h-6v-6Zm9 0h6v6h-6v-6Z",
-  product: "M4 6.5h16M4 12h10M4 17.5h7m8.5-3.5 2 2-2 2",
-  "use-cases": "M12 3.5 20 8l-8 4.5L4 8l8-4.5Zm-8 9L12 17l8-4.5M4 16.5 12 21l8-4.5",
-  agencies: "M8.5 10.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5 9a5 5 0 0 1 10 0m2-9a2.5 2.5 0 1 0 0-5m1.5 14h3.5a4.5 4.5 0 0 0-5-4.5",
-  pricing: "M3.5 12.5 11 5h8v8l-7.5 7.5-8-8Zm11.5-4h.01",
-  "sign-in": "M14 4.5h4.5v15H14M10 8l4 4-4 4m4-4H3.5",
+/* Each card's preview: a tiny piece of what's on that page, drawn in the
+   site's own language (keyword marks, DM bubbles, prices), not an icon. */
+
+function ProductPreview() {
+  return (
+    <span aria-hidden="true" className="flex items-center gap-2">
+      <span className="rounded-full bg-white/[0.07] px-2.5 py-1 text-[11px] text-site-paper">
+        <mark className="marker text-[10px]">LINK</mark> please
+      </span>
+      <svg className="h-3.5 w-3.5 shrink-0 text-site-dim" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 8h9m-3.5-3.5L12 8l-3.5 3.5" />
+      </svg>
+      <span className="rounded-full rounded-br-md bg-site-reply px-2.5 py-1 text-[11px] text-white">
+        Here&apos;s your link
+      </span>
+    </span>
+  );
+}
+
+function TemplatesPreview() {
+  return (
+    <span aria-hidden="true" className="flex flex-wrap gap-1">
+      {["LINK", "PRICE", "GUIDE"].map((word) => (
+        <mark key={word} className="marker text-[10px]">
+          {word}
+        </mark>
+      ))}
+    </span>
+  );
+}
+
+function UseCasesPreview() {
+  return (
+    <span aria-hidden="true" className="flex -space-x-1.5">
+      {[
+        ["S", "bg-[#5c2a12]"],
+        ["C", "bg-[#0b3a57]"],
+        ["G", "bg-[#1f3a2e]"],
+      ].map(([letter, tone]) => (
+        <span
+          key={letter}
+          className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#0b181e] text-[10px] font-semibold text-white ${tone}`}
+        >
+          {letter}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function AgenciesPreview() {
+  return (
+    <span aria-hidden="true" className="flex items-end gap-[3px]">
+      {[40, 65, 50, 85, 70].map((height, index) => (
+        <span
+          key={index}
+          className={`w-1.5 rounded-t-sm ${index === 3 ? "bg-site-marker" : "bg-site-reply/70"}`}
+          style={{ height: `${height * 0.28}px` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function PricingPreview() {
+  return (
+    <span aria-hidden="true" className="flex items-baseline gap-1">
+      <span className="site-mono text-[10px] text-site-dim">from</span>
+      <span className="display text-2xl leading-none text-site-paper">₹0</span>
+    </span>
+  );
+}
+
+const previews: Record<string, () => React.ReactElement> = {
+  product: ProductPreview,
+  templates: TemplatesPreview,
+  "use-cases": UseCasesPreview,
+  agencies: AgenciesPreview,
+  pricing: PricingPreview,
 };
 
-function Icon({ name }: { name: string }) {
+function Chevron() {
   return (
-    <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={icons[name] ?? icons.product} />
+    <svg className="h-4 w-4 text-site-dim transition-transform group-hover/card:translate-x-0.5 group-hover/card:text-site-paper motion-reduce:transition-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 3.5 10.5 8 6 12.5" />
     </svg>
   );
 }
 
 /**
- * The header's menu below desktop width: a solid panel of cards, one per
- * section, each with an icon and a line on what's there, and Sign in along
- * the bottom. It closes when a card is chosen, on Escape (returning focus to
+ * The header's menu below desktop width: a solid panel of cards. Product is
+ * the wide card on top; the others sit two by two, each with a small preview
+ * of its page; Sign in runs along the bottom. Cards fade in one after another
+ * as it opens. It closes when a card is chosen, on Escape (returning focus to
  * the button), and on a tap outside. Without JavaScript the <details> still
  * opens and closes.
  */
@@ -73,6 +145,12 @@ export default function MobileMenu({
     if (ref.current) ref.current.open = false;
   };
 
+  // Product leads as the wide card; the rest follow in their usual order.
+  const ordered = [
+    ...links.filter((link) => link.key === "product"),
+    ...links.filter((link) => link.key !== "product"),
+  ];
+
   return (
     <details ref={ref} className={`group relative ${className}`}>
       <summary
@@ -86,54 +164,64 @@ export default function MobileMenu({
       </summary>
       <nav
         aria-label="Main"
-        className="menu-panel absolute right-0 top-[calc(100%+0.75rem)] w-[min(24rem,calc(100vw-1.5rem))] rounded-[1.75rem] border border-white/10 bg-[#071217] p-2 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.85)]"
+        className="menu-panel absolute right-0 top-[calc(100%+0.75rem)] w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#071217] p-2 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.85)]"
       >
-        <ul className="grid grid-cols-2 gap-2">
-          {links.map((link) => {
+        {/* A soft light in the panel's corner, like the page's beam. */}
+        <span aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-site-reply/20 blur-3xl" />
+        <span aria-hidden="true" className="pointer-events-none absolute -bottom-20 -left-16 h-40 w-40 rounded-full bg-site-marker/10 blur-3xl" />
+
+        <ul className="relative grid grid-cols-2 gap-2">
+          {ordered.map((link, index) => {
             const current = active === link.key;
+            const wide = link.key === "product";
+            const Preview = previews[link.key];
             return (
-              <li key={link.key}>
+              <li key={link.key} className={`menu-card ${wide ? "col-span-2" : ""}`} style={{ "--i": index } as React.CSSProperties}>
                 <Link
                   href={link.href}
                   onClick={closeMenu}
                   aria-current={current ? "page" : undefined}
-                  className={`flex h-full min-h-[6.5rem] flex-col justify-between gap-3 rounded-2xl border p-3.5 transition-colors ${
+                  className={`group/card flex h-full flex-col justify-between gap-4 rounded-2xl border p-3.5 transition-colors ${
+                    wide ? "min-h-[7rem]" : "min-h-[7.5rem]"
+                  } ${
                     current
                       ? "border-site-reply/40 bg-site-reply/10"
-                      : "border-white/[0.07] bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.07]"
+                      : "border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] hover:border-white/20"
                   }`}
                 >
-                  <span
-                    className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-                      current ? "bg-site-reply/20 text-[#5cc4f5]" : "bg-white/[0.06] text-site-paper"
-                    }`}
-                  >
-                    <Icon name={link.key} />
+                  <span className="flex items-start justify-between gap-2">
+                    {Preview && <Preview />}
+                    {wide && <Chevron />}
                   </span>
-                  <span>
-                    <span className="flex items-center gap-1.5 text-[15px] font-semibold text-site-paper">
-                      {link.label}
-                      {current && <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-site-marker" />}
+                  <span className="flex items-end justify-between gap-2">
+                    <span>
+                      <span className="flex items-center gap-1.5 text-[15px] font-semibold text-site-paper">
+                        {link.label}
+                        {current && <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-site-marker" />}
+                      </span>
+                      <span className="mt-0.5 block text-[12px] leading-4 text-site-dim">{link.description}</span>
                     </span>
-                    <span className="mt-0.5 block text-[12px] leading-4 text-site-dim">{link.description}</span>
+                    {!wide && <Chevron />}
                   </span>
                 </Link>
               </li>
             );
           })}
-          {/* Sign in spans the row below the section cards. */}
-          <li className={links.length % 2 === 0 ? "col-span-2" : ""}>
+
+          {/* Sign in along the bottom, as a slim row. */}
+          <li className="menu-card col-span-2" style={{ "--i": ordered.length } as React.CSSProperties}>
             <Link
               href="/login"
               onClick={closeMenu}
-              className="flex h-full min-h-[6.5rem] flex-col justify-between gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-3.5 transition-colors hover:border-white/15 hover:bg-white/[0.07]"
+              className="group/card flex min-h-12 items-center gap-3 rounded-2xl border border-white/[0.07] px-3.5 transition-colors hover:border-white/20 hover:bg-white/[0.04]"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.06] text-site-paper">
-                <Icon name="sign-in" />
-              </span>
-              <span>
-                <span className="block text-[15px] font-semibold text-site-paper">Sign in</span>
-                <span className="mt-0.5 block text-[12px] leading-4 text-site-dim">Email link, no password</span>
+              <svg className="h-[18px] w-[18px] text-site-dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3.5 6.5h17v11h-17v-11Zm0 0 8.5 6.5 8.5-6.5" />
+              </svg>
+              <span className="text-[15px] font-semibold text-site-paper">Sign in</span>
+              <span className="text-[12px] text-site-dim">Email link, no password</span>
+              <span className="ml-auto">
+                <Chevron />
               </span>
             </Link>
           </li>

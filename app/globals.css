@@ -682,3 +682,10 @@ html.lenis body {
     animation: menu-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
+
+/* Menu cards fade up one after another as the menu opens. */
+@media (prefers-reduced-motion: no-preference) {
+  details[open] .menu-card {
+    animation: seq-in 0.35s calc(0.04s * var(--i, 0) + 0.05s) cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
