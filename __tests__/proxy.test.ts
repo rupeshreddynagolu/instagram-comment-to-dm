@@ -41,7 +41,7 @@ describe("proxy", () => {
   });
 
   it("never follows a backslash or absolute callbackUrl off-site", () => {
-    for (const bad of ["/\\evil.example/x", "https://evil.example/x", "/%5Cevil.example"]) {
+    for (const bad of ["/\\evil.example/x", "https://evil.example/x", "/%5Cevil.example", "/.//evil.example/x", "/./\\evil.example"]) {
       const res = proxy(
         request(`http://localhost/login?callbackUrl=${encodeURIComponent(bad)}`, true)
       );
