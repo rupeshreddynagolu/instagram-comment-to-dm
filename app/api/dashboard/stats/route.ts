@@ -7,7 +7,7 @@ import {
   normalizeTopKeywords,
   summarizeDmStatuses,
 } from "@/lib/tracking/analytics";
-import { isRazorpayConfigured } from "@/lib/razorpay";
+import { isRazorpayConfigured, isRazorpayYearlyConfigured } from "@/lib/razorpay";
 
 export async function GET(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
@@ -199,6 +199,7 @@ export async function GET(request: NextRequest) {
       billingProviders: {
         stripe: Boolean(process.env.STRIPE_SECRET_KEY),
         razorpay: isRazorpayConfigured(),
+        razorpayYearly: isRazorpayYearlyConfigured(),
       },
       totalAutomations,
       activeAutomations,

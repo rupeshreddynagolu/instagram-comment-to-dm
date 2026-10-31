@@ -45,3 +45,6 @@ next-env.d.ts
 
 # cPanel package (npm run package:cpanel)
 /dist/
+
+# Playwright MCP browser logs and screenshots
+/.playwright-mcp/

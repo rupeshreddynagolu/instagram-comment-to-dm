@@ -16,6 +16,6 @@ export const metadata: Metadata = {
 };
 
 export default function InstagramDmAutomationAgenciesPage() {
-  return <SeoPageShell config={agenciesSeoPage} />;
+  return <SeoPageShell config={agenciesSeoPage} active="agencies" />;
 }
 

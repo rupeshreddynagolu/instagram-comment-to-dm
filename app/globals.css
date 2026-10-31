@@ -2,7 +2,7 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ReplyNxt — Design System
-   Dark-mode-first with indigo/violet accents and glassmorphism
+   Dark-mode-first with the site's Electric Blue accent and glassmorphism
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @theme inline {
@@ -13,13 +13,26 @@
   --color-border: rgba(255, 255, 255, 0.06);
   --color-border-hover: rgba(255, 255, 255, 0.12);
   --color-muted: #a1a1aa;
-  --color-accent: #818cf8;
-  --color-accent-hover: #6366f1;
-  --color-accent-glow: rgba(129, 140, 248, 0.15);
+  /* The app shares the public site's blue; dark text sits on it (6.2:1). */
+  --color-accent: #0297de;
+  --color-accent-hover: #23aaf0;
+  --color-accent-glow: rgba(2, 151, 222, 0.15);
   --color-success: #34d399;
   --color-error: #f87171;
   --color-warning: #fbbf24;
   --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+
+  /* Public site (home, templates, SEO, legal, login). The dashboard keeps
+     the tokens above. */
+  --color-site-ink: #02070a;
+  --color-site-panel: #08141a;
+  --color-site-raised: #0f1f27;
+  --color-site-line: #1c2d35;
+  --color-site-paper: #eef4f6;
+  --color-site-dim: #8fa4ae;
+  --color-site-marker: #fc734d;
+  --color-site-reply: #0297de;
+  --color-site-reply-hover: #23aaf0;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
@@ -75,7 +88,7 @@ body {
 
 .gradient-mesh {
   background:
-    radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 20% 50%, rgba(2, 151, 222, 0.08) 0%, transparent 50%),
     radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
     radial-gradient(ellipse at 40% 80%, rgba(79, 70, 229, 0.04) 0%, transparent 50%);
 }
@@ -93,8 +106,8 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0); }
-  50% { box-shadow: 0 0 20px 4px rgba(129, 140, 248, 0.15); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(2, 151, 222, 0); }
+  50% { box-shadow: 0 0 20px 4px rgba(2, 151, 222, 0.15); }
 }
 
 .animate-fade-in {
@@ -117,3 +130,562 @@ body {
 .stagger > *:nth-child(4) { animation-delay: 180ms; }
 .stagger > *:nth-child(5) { animation-delay: 240ms; }
 .stagger > *:nth-child(6) { animation-delay: 300ms; }
+
+
+/* ─── Public site ──────────────────────────────────────────────────────── */
+
+.site {
+  background: var(--color-site-ink);
+  color: var(--color-site-paper);
+  font-family: var(--font-geist-site), "Segoe UI", system-ui, sans-serif;
+  font-optical-sizing: auto;
+}
+
+.site h1,
+.site h2,
+.site .display {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.site h1 em,
+.site h2 em {
+  font-style: italic;
+}
+
+/* Navigation, labels and the hero's supporting line. */
+.site-mono {
+  font-family: var(--font-geist-mono-site), ui-monospace, monospace;
+  letter-spacing: 0;
+}
+
+
+.site :focus-visible {
+  outline: 2px solid var(--color-site-marker);
+  outline-offset: 3px;
+}
+
+/* A keyword, marked the way you'd mark it in a comment with a highlighter:
+   one solid orange fill with soft corners, ink text (7.4:1). The fill is a
+   background image so it can sweep in from the left; the <mark> element's
+   own yellow is cleared so no edge of it shows. */
+.marker {
+  background-color: transparent;
+  background-image: linear-gradient(var(--color-site-marker), var(--color-site-marker));
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: 0 50%;
+  border-radius: 0.3em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  color: var(--color-site-ink);
+  font-weight: 600;
+  padding: 0.04em 0.32em;
+}
+
+/* The home page's one orchestrated moment: a comment arrives, its keyword
+   is marked, and the DM lands. */
+@keyframes site-arrive {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes site-mark {
+  from { background-size: 0% 100%; color: var(--color-site-paper); }
+  to { background-size: 100% 100%; color: var(--color-site-ink); }
+}
+
+.thread-comment { animation: site-arrive 0.5s 0.2s ease-out both; }
+.thread-comment .marker { animation: site-mark 0.45s 0.85s ease-in-out both; }
+.thread-reply { animation: site-arrive 0.5s 1.45s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .thread-comment,
+  .thread-reply,
+  .thread-comment .marker {
+    animation: none;
+  }
+}
+
+/* Legal pages: body copy written as plain sections and paragraphs. */
+.legal-copy h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-site-paper);
+}
+
+.legal-copy p,
+.legal-copy li {
+  color: var(--color-site-dim);
+  line-height: 1.8;
+}
+
+.legal-copy a {
+  color: var(--color-site-paper);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Pressed state for every link and button on the public site: feedback the
+   moment a finger or click lands, with no motion. */
+.site :is(a, button, summary):not(.cta):active {
+  opacity: 0.78;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .site :is(button, a.rounded-full):not(.cta) {
+    transition-property: color, background-color, border-color, opacity, transform;
+    transition-duration: 150ms;
+  }
+
+  .site :is(button, a.rounded-full):not(.cta):active {
+    transform: scale(0.98);
+  }
+}
+
+/* Increase Contrast: brighter secondary text and divider lines. The theme is
+   inlined into utilities, so the utilities are overridden as well as the
+   variables the hand-written rules read. */
+@media (prefers-contrast: more) {
+  .site {
+    --color-site-dim: #cbd8de;
+    --color-site-line: #4f6672;
+  }
+
+  .site .text-site-dim {
+    color: #cbd8de;
+  }
+
+  .site .border-site-line,
+  .site .divide-site-line > :not(:last-child) {
+    border-color: #4f6672;
+  }
+}
+
+/* ─── Cinematic site system ─────────────────────────────────────────────── */
+
+/* The one card: frosted glass with a lit top edge. */
+.glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.glass-glow-orange {
+  border-color: rgba(252, 115, 77, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 30px 80px -40px rgba(252, 115, 77, 0.55);
+}
+
+
+/* The page's opening light behind the hero; it fades out into the canvas. */
+.beam-hero {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 6px),
+    radial-gradient(60% 55% at 50% 100%, rgba(252, 115, 77, 0.85), transparent 70%),
+    radial-gradient(45% 70% at 50% 0%, rgba(2, 151, 222, 0.75), transparent 75%),
+    linear-gradient(180deg, rgba(3, 43, 69, 0.85) 0%, rgba(2, 7, 10, 0.55) 45%, rgba(42, 15, 8, 0.85) 100%);
+  /* The ellipse ends at 96% of the height, so the light has fully faded
+     before the element's bottom edge and never shows a line. */
+  -webkit-mask-image: radial-gradient(80% 56% at 50% 40%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(80% 56% at 50% 40%, #000 40%, transparent 100%);
+}
+
+
+
+
+/* Endless photo strip; paused on hover and with reduced motion. */
+@keyframes site-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  animation: site-marquee 60s linear infinite;
+}
+
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
+/* Lenis: let it own scrolling without the browser smoothing on top. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* Liquid light that follows the cursor (components/site/liquid-cursor.tsx).
+   Each glow is centred on its transform position and keeps changing shape. */
+@keyframes liquid-morph {
+  0%, 100% { border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%; }
+  33% { border-radius: 63% 37% 41% 59% / 57% 38% 62% 43%; }
+  66% { border-radius: 38% 62% 55% 45% / 63% 52% 48% 37%; }
+}
+
+.liquid-blob {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 46vmax;
+  height: 46vmax;
+  margin: -23vmax 0 0 -23vmax;
+  filter: blur(70px);
+  mix-blend-mode: screen;
+  will-change: transform;
+  animation: liquid-morph 14s ease-in-out infinite;
+}
+
+.liquid-blob-blue {
+  background: radial-gradient(circle at 40% 40%, rgba(2, 151, 222, 0.55), rgba(2, 151, 222, 0) 68%);
+}
+
+.liquid-blob-orange {
+  width: 38vmax;
+  height: 38vmax;
+  margin: -19vmax 0 0 -19vmax;
+  background: radial-gradient(circle at 60% 60%, rgba(252, 115, 77, 0.45), rgba(252, 115, 77, 0) 68%);
+  animation-duration: 18s;
+  animation-direction: reverse;
+}
+
+/* A small bright core right under the pointer that lights the fine lines. */
+.liquid-lens {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22rem;
+  height: 22rem;
+  margin: -11rem 0 0 -11rem;
+  border-radius: 9999px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 6px);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 70%);
+  mask-image: radial-gradient(circle, #000 0%, transparent 70%);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-blob {
+    animation: none;
+  }
+}
+
+/* The fine vertical lines, drawn once for the whole page so they run through
+   every section at the same 6px pitch. They sit above the liquid glow, so the
+   glow lights them up as it passes. */
+.page-lines {
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 6px);
+}
+
+@layer components {
+  /* ─── Call-to-action button (components/site/cta-button.tsx) ─────────────
+     Dark glass with a blue-to-orange rim: the site's two colours, as on the
+     usage bar. The rim is a border-box gradient behind a padding-box fill, so
+     the inside stays the page's dark and the light text reads at 17:1. The
+     secondary capsule is a quiet translucent fill with a plain edge. */
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    border: 1.5px solid transparent;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    color: var(--color-site-paper);
+    background:
+      linear-gradient(#071217, #071217) padding-box,
+      linear-gradient(90deg, var(--color-site-reply), var(--color-site-marker)) border-box;
+    box-shadow: 0 10px 30px -18px rgba(2, 151, 222, 0.7);
+    transition: box-shadow 200ms ease, transform 150ms ease;
+  }
+
+  .cta:hover {
+    background:
+      linear-gradient(#0c1d25, #0c1d25) padding-box,
+      linear-gradient(90deg, var(--color-site-reply-hover), #fd8b6b) border-box;
+    box-shadow:
+      0 10px 34px -16px rgba(2, 151, 222, 0.8),
+      0 10px 34px -20px rgba(252, 115, 77, 0.6);
+  }
+
+  .cta:active:not(:disabled) {
+    background:
+      linear-gradient(#050c10, #050c10) padding-box,
+      linear-gradient(90deg, var(--color-site-reply), var(--color-site-marker)) border-box;
+  }
+
+  .cta:disabled {
+    cursor: wait;
+    opacity: 0.75;
+  }
+
+  .cta-secondary,
+  .cta-secondary:hover,
+  .cta-secondary:active:not(:disabled) {
+    box-shadow: none;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .cta-secondary {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .cta-secondary:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .cta-secondary:active:not(:disabled) {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .cta-chevron {
+    flex-shrink: 0;
+    transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cta:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .cta:hover .cta-chevron {
+      transform: translateX(2px);
+    }
+  }
+
+  @media (prefers-contrast: more) {
+    .cta {
+      border-width: 2px;
+    }
+
+    .cta-secondary {
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+  }
+}
+
+/* Hero phone (components/home/hero-flow.tsx): each step waits for its --d. */
+@keyframes flow-sheet-in {
+  from { transform: translateY(105%); }
+  to { transform: translateY(0); }
+}
+
+/* A finger tapping a DM button: it dips and lights up. */
+@keyframes flow-tap {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.93); background-color: var(--color-site-reply); color: var(--color-site-ink); }
+  100% { transform: scale(1); background-color: var(--color-site-reply); color: var(--color-site-ink); }
+}
+
+.flow-tap {
+  background-color: var(--color-site-reply);
+  color: var(--color-site-ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .flow-step { animation: site-arrive 0.5s var(--d, 0s) ease-out both; }
+  .flow-mark { animation: site-mark 0.45s var(--d, 0.85s) ease-in-out both; }
+  .flow-sheet { animation: flow-sheet-in 0.7s var(--d, 0s) cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .flow-tap { animation: flow-tap 0.6s 0.2s ease-out both; }
+}
+
+/* Use-case cards (components/home/use-cases.tsx). Each moves a little on
+   its own and answers the pointer; with reduced motion they sit still. */
+.use-card {
+  transition: border-color 300ms ease, transform 300ms ease;
+}
+
+.use-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes live-ping {
+  0% { transform: scale(1); opacity: 0.7; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* Four keywords, each held for a beat, then a seamless jump back. */
+@keyframes ticker {
+  0%, 20% { transform: translateY(0); }
+  25%, 45% { transform: translateY(-1.25rem); }
+  50%, 70% { transform: translateY(-2.5rem); }
+  75%, 95% { transform: translateY(-3.75rem); }
+  100% { transform: translateY(-5rem); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .use-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .live-ping {
+    animation: live-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  .ticker-track {
+    animation: ticker 6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+}
+
+/* Card sequences (components/site/in-view.tsx). A card is "armed" once
+   JavaScript runs and "inview" the first time it is mostly on screen. Its
+   steps wait hidden until then and play once, each after its --d. Without
+   JavaScript or with reduced motion everything shows in its final state. */
+@keyframes seq-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes seq-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  60% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes fill-in {
+  from { transform: scaleX(0); }
+  to { transform: none; }
+}
+
+@keyframes grow-in {
+  from { transform: scaleY(0); }
+  to { transform: none; }
+}
+
+/* A step's dot turning into a filled tick. */
+@keyframes step-done {
+  from { background-color: #071015; border-color: rgba(255, 255, 255, 0.2); color: transparent; }
+  to { background-color: var(--color-site-reply); border-color: var(--color-site-reply); color: var(--color-site-ink); }
+}
+
+@keyframes fade-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+.step-dot {
+  background-color: var(--color-site-reply);
+  border-color: var(--color-site-reply);
+}
+
+.pay-processing {
+  opacity: 0;
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-armed]:not([data-inview]) :is(.seq, .seq-pop) {
+    opacity: 0;
+  }
+
+  [data-armed]:not([data-inview]) :is(.fill-bar) {
+    transform: scaleX(0);
+  }
+
+  [data-armed]:not([data-inview]) .grow-bar {
+    transform: scaleY(0);
+  }
+
+  [data-armed]:not([data-inview]) .seq-mark {
+    background-size: 0% 100%;
+    color: var(--color-site-paper);
+  }
+
+  [data-armed]:not([data-inview]) .step-dot {
+    background-color: #071015;
+    border-color: rgba(255, 255, 255, 0.2);
+    color: transparent;
+  }
+
+  [data-armed]:not([data-inview]) .pay-active {
+    opacity: 0;
+  }
+
+  [data-inview] .seq {
+    animation: seq-in 0.5s var(--d, 0s) cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  [data-inview] .seq-pop {
+    animation: seq-pop 0.45s var(--d, 0s) cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  [data-inview] .seq-mark {
+    animation: site-mark 0.45s var(--d, 0s) ease-in-out both;
+  }
+
+  [data-inview] .fill-bar {
+    animation: fill-in 1.2s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  [data-inview] .grow-bar {
+    animation: grow-in 0.7s var(--d, 0s) cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  [data-inview] .step-dot {
+    animation: step-done 0.35s var(--d, 0s) ease-out both;
+  }
+
+  /* "Payment clearing" for a moment, then "Pro is active". */
+  [data-inview] .pay-processing {
+    opacity: 1;
+    visibility: visible;
+    animation: fade-out 0.2s 1.4s ease forwards;
+  }
+
+  [data-inview] .pay-active {
+    animation: seq-pop 0.45s 1.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+}
+
+/* Pricing (components/home/pricing-plans.tsx): the figure settles in when the
+   billing period changes. */
+@keyframes price-swap {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .price-swap {
+    animation: price-swap 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* The header's menu panel (components/site/mobile-menu.tsx) drops in. */
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  details[open] > .menu-panel {
+    transform-origin: top right;
+    animation: menu-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* Menu cards fade up one after another as the menu opens. */
+@media (prefers-reduced-motion: no-preference) {
+  details[open] .menu-card {
+    animation: seq-in 0.35s calc(0.04s * var(--i, 0) + 0.05s) cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}

@@ -152,6 +152,66 @@ describe("POST /api/billing/razorpay/checkout", () => {
   });
 });
 
+describe("POST /api/billing/razorpay/checkout, yearly", () => {
+  beforeEach(() => {
+    mockPrisma.workspace.findUnique.mockResolvedValue({
+      subscriptionStatus: "NONE",
+      razorpaySubscriptionId: null,
+    });
+    mockCreateRazorpaySubscription.mockResolvedValue({
+      id: "sub_year",
+      plan_id: "plan_pro_yearly",
+      short_url: "https://rzp.io/i/year",
+    });
+  });
+
+  it("subscribes to the yearly plan for ten yearly cycles", async () => {
+    vi.stubEnv("RAZORPAY_PLAN_PRO_YEARLY", "plan_pro_yearly");
+    vi.stubEnv("RAZORPAY_PLAN_AGENCY_YEARLY", "plan_agency_yearly");
+
+    const res = await razorpayCheckout(
+      jsonRequest("http://localhost/api/billing/razorpay/checkout", {
+        plan: "PRO",
+        interval: "YEARLY",
+      })
+    );
+
+    expect(await res.json()).toEqual({ success: true, url: "https://rzp.io/i/year" });
+    expect(mockCreateRazorpaySubscription).toHaveBeenCalledWith({
+      planId: "plan_pro_yearly",
+      totalCount: 10,
+      notes: { workspaceId: "ws_1", plan: "PRO", interval: "YEARLY" },
+    });
+  });
+
+  it("keeps monthly as the default when no interval is sent", async () => {
+    await razorpayCheckout(
+      jsonRequest("http://localhost/api/billing/razorpay/checkout", { plan: "AGENCY" })
+    );
+
+    expect(mockCreateRazorpaySubscription).toHaveBeenCalledWith({
+      planId: "plan_agency",
+      totalCount: 120,
+      notes: { workspaceId: "ws_1", plan: "AGENCY", interval: "MONTHLY" },
+    });
+  });
+
+  it("answers 503 for yearly when the yearly plans are not set up", async () => {
+    vi.stubEnv("RAZORPAY_PLAN_PRO_YEARLY", "");
+
+    const res = await razorpayCheckout(
+      jsonRequest("http://localhost/api/billing/razorpay/checkout", {
+        plan: "PRO",
+        interval: "YEARLY",
+      })
+    );
+
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/Yearly billing/);
+    expect(mockCreateRazorpaySubscription).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/billing/razorpay/cancel", () => {
   it("records the pending cancellation, since Razorpay keeps the subscription active", async () => {
     mockPrisma.workspace.findUnique.mockResolvedValue({

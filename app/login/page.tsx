@@ -1,4 +1,9 @@
-import { EMAIL_PROVIDER_ID, signIn } from "@/lib/auth";
+import Link from "next/link";
+import SignInForm from "@/components/sign-in-form";
+import SiteShell from "@/components/site-shell";
+import { GlassCard } from "@/components/site/primitives";
+import Reveal from "@/components/site/reveal";
+import SplitHeadline from "@/components/site/split-headline";
 import { isCheckEmailRedirect } from "@/lib/login/check-email";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
 
@@ -7,12 +12,28 @@ export const metadata = {
   description: "Sign in to manage Instagram comment-to-DM campaigns.",
 };
 
+// What happens after signing in, in order.
+const steps = [
+  { title: "Enter your email", body: "Back again? Use your password. New here? We email a link to verify it." },
+  { title: "Connect Instagram", body: "Link your Instagram professional account through Meta." },
+  { title: "Pick a post and go live", body: "Choose the keywords and the reply. ReplyNxt handles the rest." },
+];
+
+function MailIcon({ className = "h-6 w-6" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 6.5h17v11h-17v-11Zm0 0 8.5 6.5 8.5-6.5" />
+    </svg>
+  );
+}
+
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{
     checkEmail?: string;
     type?: string;
+    error?: string;
     callbackUrl?: string;
     template?: string;
   }>;
@@ -25,93 +46,113 @@ export default async function LoginPage({
     : null;
   const callbackUrl = params.callbackUrl ?? templateCallbackUrl ?? "/dashboard";
 
-  async function sendMagicLink(formData: FormData) {
-    "use server";
-    await signIn(EMAIL_PROVIDER_ID, {
-      email: String(formData.get("email") ?? ""),
-      redirectTo: callbackUrl,
-    });
-  }
+  const linkError = params.error
+    ? params.error === "Verification"
+      ? "That sign-in link has expired or was already used. Enter your email to get a new one."
+      : "The sign-in email could not be sent. Check the address and try again."
+    : null;
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center gradient-mesh overflow-hidden px-6">
-      <div className="relative z-10 w-full max-w-md animate-fade-in">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 mb-5">
-            <svg
-              className="w-7 h-7 text-accent"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm3.75 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm3.75 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"
-              />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            ReplyNxt
-          </h1>
-          <p className="text-muted text-sm leading-relaxed mt-2">
+    <SiteShell footer={false}>
+      {/* The beam behind the page, as on the home page's opening. */}
+      <div
+        aria-hidden="true"
+        className="beam-hero pointer-events-none absolute inset-x-0 top-0 -z-10 h-[120dvh]"
+      />
+
+      <div className="mx-auto grid min-h-[calc(100dvh-7rem)] w-full max-w-6xl items-center gap-10 px-4 pb-16 pt-4 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
+        {/* What you're signing in to, and what comes next. */}
+        <div>
+          <Reveal onLoadDelay={0}>
+            <p className="site-mono text-[13px] text-site-paper">
+              {selectedTemplate ? "Template selected" : "Sign in or create your account"}
+            </p>
+          </Reveal>
+          <SplitHeadline
+            as="h1"
+            onLoad
+            className="mt-4 max-w-[12em] text-[clamp(2.5rem,5vw,4.25rem)] leading-[1.02]"
+          >
             {selectedTemplate
-              ? `Sign in to use the ${selectedTemplate.title} template.`
-              : "Sign in by email, then connect your Instagram professional account."}
-          </p>
-        </div>
+              ? `Sign in to use the ${selectedTemplate.title} template`
+              : "Your next comment deserves the right reply"}
+          </SplitHeadline>
 
-        <div className="glass-strong rounded-2xl p-8 shadow-2xl shadow-black/40">
-          {selectedTemplate && !checkEmail && (
-            <div className="mb-5 border border-cyan-200/20 bg-cyan-300/10 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100">
-                Template selected
+          {selectedTemplate ? (
+            <Reveal onLoadDelay={0.4}>
+              <p className="mt-6 max-w-lg text-lg leading-8 text-site-paper/85">{selectedTemplate.summary}</p>
+              <p className="mt-5 flex flex-wrap gap-1.5" aria-label="Keywords">
+                {selectedTemplate.keywords.map((keyword) => (
+                  <mark key={keyword} className="marker text-[14px]">
+                    {keyword}
+                  </mark>
+                ))}
               </p>
-              <p className="mt-2 text-sm font-semibold text-white">
-                {selectedTemplate.title}
-              </p>
-            </div>
-          )}
-
-          {checkEmail ? (
-            <div className="text-center py-4">
-              <h2 className="text-lg font-semibold mb-2">Check your email</h2>
-              <p className="text-sm text-muted">
-                We sent you a secure sign-in link. Open it on this device to
-                continue.
-              </p>
-            </div>
+            </Reveal>
           ) : (
-            <form action={sendMagicLink} className="space-y-5">
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-foreground"
-                >
-                  Work email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="you@company.com"
-                  className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none transition-colors"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-xl hover:shadow-indigo-500/30"
-              >
-                Email me a magic link
-              </button>
-            </form>
+            <Reveal onLoadDelay={0.4} as="ol" className="mt-10 hidden max-w-lg space-y-6 lg:block">
+              {steps.map((step, index) => (
+                <li key={step.title} className="flex gap-4">
+                  <span className="site-mono flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 text-[13px] text-site-paper">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <p className="text-lg font-semibold">{step.title}</p>
+                    <p className="mt-0.5 text-[15px] leading-6 text-site-dim">{step.body}</p>
+                  </div>
+                </li>
+              ))}
+            </Reveal>
           )}
         </div>
+
+        {/* The form, or the "check your email" state after sending. */}
+        <Reveal onLoadDelay={0.3}>
+          <GlassCard className="w-full p-6 sm:p-9 lg:max-w-md lg:justify-self-end">
+            {checkEmail ? (
+              <div role="status">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-site-reply/15 text-site-reply">
+                  <MailIcon />
+                </span>
+                <h2 className="mt-6 text-3xl leading-tight">Check your email</h2>
+                <p className="mt-3 text-base leading-7 text-site-dim">
+                  We sent you a secure sign-in link. Open it on this device to continue; if you
+                  haven&apos;t set a password yet, you&apos;ll choose one next. The link works once and
+                  expires after 24 hours.
+                </p>
+                <p className="mt-6 text-[15px] text-site-dim">
+                  Nothing arrived? Check spam, or{" "}
+                  <Link href="/login" className="font-semibold text-site-paper underline underline-offset-4 hover:text-site-reply-hover">
+                    send a new link
+                  </Link>
+                  .
+                </p>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-3xl leading-tight">Sign in or create an account</h2>
+                <p className="mt-2 text-[15px] leading-6 text-site-dim">
+                  Start with your email. We&apos;ll ask for your password, or send a link if you&apos;re new.
+                </p>
+                <div className="mt-7">
+                  <SignInForm callbackUrl={callbackUrl} linkError={linkError} />
+                </div>
+                <p className="mt-6 text-[13px] leading-5 text-site-dim">
+                  By continuing you agree to the{" "}
+                  <Link href="/terms" className="text-site-paper underline underline-offset-4 hover:text-site-reply-hover">
+                    Terms
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" className="text-site-paper underline underline-offset-4 hover:text-site-reply-hover">
+                    Privacy policy
+                  </Link>
+                  .
+                </p>
+              </>
+            )}
+          </GlassCard>
+        </Reveal>
       </div>
-    </div>
+    </SiteShell>
   );
 }

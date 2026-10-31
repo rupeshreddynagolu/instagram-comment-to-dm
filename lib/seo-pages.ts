@@ -1,237 +1,267 @@
 import type { SeoPageConfig } from "@/components/seo-page-shell";
 
-const templateLinks = [
-  { label: "DTC product link template", href: "/templates/dtc-product-link" },
-  { label: "Real estate lead form template", href: "/templates/real-estate-lead-form" },
-  { label: "Fitness plan template", href: "/templates/fitness-plan" },
-  { label: "Browse every template", href: "/templates" },
-];
+// Templates offered on each guide; keywords match lib/templates/campaign-templates.ts.
+const template = {
+  dtc: { label: "DTC product link", keywords: ["LINK", "SHOP", "BUY"], href: "/templates/dtc-product-link" },
+  realEstate: { label: "Real estate lead form", keywords: ["HOME", "LISTING", "VALUE"], href: "/templates/real-estate-lead-form" },
+  fitness: { label: "Fitness plan download", keywords: ["PLAN", "FIT", "START"], href: "/templates/fitness-plan" },
+  webinar: { label: "Course webinar invite", keywords: ["WEBINAR", "CLASS", "LEARN"], href: "/templates/course-webinar" },
+  beauty: { label: "Beauty price list", keywords: ["PRICE", "MENU", "BOOK"], href: "/templates/beauty-price-list" },
+  restaurant: { label: "Restaurant menu and booking", keywords: ["MENU", "TABLE", "RESERVE"], href: "/templates/restaurant-menu" },
+  event: { label: "Event RSVP", keywords: ["RSVP", "TICKET", "JOIN"], href: "/templates/event-rsvp" },
+  creator: { label: "Creator media kit", keywords: ["COLLAB", "KIT", "RATES"], href: "/templates/creator-media-kit" },
+};
 
 export const manychatAlternativePage: SeoPageConfig = {
   eyebrow: "Manychat alternative",
-  title: "A focused Manychat alternative for Instagram comment-to-DM campaigns",
+  title: "A focused Manychat alternative for Instagram comment-to-DM",
   description:
-    "ReplyNxt is for teams that do not need a broad chatbot builder. It turns keyword comments into Meta-compliant private replies, tracked links, campaign analytics, and client reports.",
-  primaryCta: "Try the focused alternative",
+    "If all you need is comment LINK, get a DM, ReplyNxt does that one job well: keyword comments become official private replies with tracked links and reports you can share.",
+  primaryCta: "Start free",
   bullets: [
-    "Built around Instagram comments, posts, reels, and private replies.",
-    "Official Meta API flow with no scraping or password sharing.",
-    "Campaign templates, tracked links, and shareable client reports.",
-    "Open-source core with hosted SaaS for agencies that want managed reliability.",
+    "One campaign per post or reel: keywords, reply, link",
+    "Official Meta API, no scraping and no password sharing",
+    "Tracked links and shareable client reports",
+    "MIT-licensed open-source core, or the hosted app",
   ],
+  sectionsTitle: "Built for one job, not every chat",
   sections: [
     {
-      title: "Narrower by design",
-      body: "Broad automation suites can be powerful, but they also add flow-builder weight. ReplyNxt keeps the campaign path tight: keyword, post, reply, link, result.",
+      title: "Narrow on purpose",
+      body: "Broad chatbot builders are powerful, but every campaign becomes a flow to build and maintain. ReplyNxt keeps the path short: keyword, post, reply, link, result.",
     },
     {
-      title: "Agency proof",
-      body: "Tracked links and shareable reports make it easier to show clients what happened after the comment, not just that a message was sent.",
+      title: "Proof for clients",
+      body: "Tracked links and read-only report pages show what happened after the comment, not just that a message went out.",
     },
     {
       title: "Meta-first delivery",
-      body: "Comment events are processed through webhooks, queued, deduped, checked against limits, and sent as private replies using the comment ID.",
+      body: "Comments arrive by webhook, are queued, checked for duplicates and plan limits, then answered as private replies to that comment.",
     },
   ],
-  comparisonTitle: "ReplyNxt vs broad chatbot builders",
+  comparisonTitle: "ReplyNxt next to a broad chatbot builder",
+  comparisonOther: "Broad chatbot builder",
   comparisons: [
     {
       label: "Setup",
-      replynxt: "Create a keyword campaign for a specific post or reel.",
-      other: "Build and maintain a larger chatbot automation flow.",
+      replynxt: "Pick a post or reel, add keywords, write the reply.",
+      other: "Design and maintain a conversation flow.",
     },
     {
       label: "Reporting",
-      replynxt: "Campaign-level sends, skips, failures, clicks, CTR, and client report links.",
-      other: "Usually broader conversation analytics that need cleanup for client reporting.",
+      replynxt: "Sends, skips, failures, clicks and click rate per campaign, with a link to share.",
+      other: "Wider conversation analytics that need cleaning up before a client sees them.",
     },
     {
-      label: "Positioning",
-      replynxt: "Instagram Campaign OS for agencies and campaign teams.",
-      other: "General DM automation across many channels and use cases.",
+      label: "Scope",
+      replynxt: "Instagram comment-to-DM campaigns for brands, creators and agencies.",
+      other: "Many channels and many kinds of automation.",
     },
   ],
-  templateLinks,
+  templateLinks: [template.dtc, template.beauty, template.creator],
   faqs: [
     {
       title: "Is ReplyNxt a full Manychat replacement?",
-      body: "No. ReplyNxt is intentionally focused on Instagram comment-to-DM campaigns. If you need a complete chatbot suite, use a broad platform. If you need fast campaign loops, ReplyNxt is built for that.",
+      body: "No, and that's deliberate. ReplyNxt only does Instagram comment-to-DM campaigns. If you need a chatbot across channels, a broad platform suits you better; if you need fast comment campaigns, ReplyNxt is built for exactly that.",
     },
     {
-      title: "Does it support agencies?",
-      body: "Yes. The Agency plan supports multiple Instagram accounts, workspace members, account filters, analytics, and shareable reports.",
+      title: "Can I move my existing comment automations?",
+      body: "Yes, by recreating them as campaigns: choose the post or reel, add the same keywords, and paste your reply. Most take a couple of minutes each.",
+    },
+    {
+      title: "Does it work for agencies?",
+      body: "Yes. The Agency plan connects up to 10 Instagram accounts, adds team members with roles, filters everything by account, and gives each campaign a shareable report.",
     },
   ],
 };
 
 export const templatesSeoPage: SeoPageConfig = {
   eyebrow: "Instagram comment-to-DM templates",
-  title: "Instagram comment-to-DM templates for high-intent campaign replies",
+  title: "Comment-to-DM templates for the replies people actually ask for",
   description:
-    "Start with proven campaign patterns for product links, lead magnets, price replies, launch waitlists, coaching offers, events, and local services.",
+    "Ready-made campaigns for product links, lead magnets, price lists, webinars, events and local services, each with its keywords, goal and reply written for you.",
   primaryCta: "Use a template",
+  secondaryCta: { label: "See all templates", href: "/templates" },
   bullets: [
-    "Template intent carries into signup and campaign creation.",
-    "Each template includes keywords, a campaign goal, and reply copy.",
-    "Tracked links turn template replies into measurable clicks.",
-    "Agencies can reuse templates across client accounts.",
+    "Keywords, a campaign goal and reply copy in every template",
+    "Pick a template before signing up and it's waiting for you after",
+    "Tracked links show which replies turned into clicks",
+    "Agencies can reuse the same template for every client",
   ],
+  sectionsTitle: "Three patterns cover most campaigns",
   sections: [
     {
       title: "Product link drops",
-      body: "Use LINK, SHOP, BUY, or SIZE comments to send exact product pages, launch bundles, or collection links.",
+      body: "LINK, SHOP, BUY or SIZE comments get the exact product page, bundle or collection, sent the moment someone asks.",
     },
     {
       title: "Lead magnets",
-      body: "Use GUIDE, CHECKLIST, PLAN, or START comments to send free resources and follow-up offers.",
+      body: "GUIDE, CHECKLIST, PLAN or START comments get a free resource, then a follow-up offer.",
     },
     {
       title: "Local services",
-      body: "Use PRICE, BOOK, INFO, or TOUR comments to deliver booking links, quote forms, and local offer pages.",
+      body: "PRICE, BOOK, INFO or TOUR comments get a price list, booking link or quote form.",
     },
   ],
-  comparisonTitle: "Template campaigns vs manual inbox replies",
+  comparisonTitle: "A template campaign next to replying by hand",
+  comparisonOther: "Replying by hand",
   comparisons: [
     {
       label: "Speed",
-      replynxt: "Launch from reusable campaign templates in minutes.",
-      other: "Reply manually or rebuild the same campaign copy each time.",
+      replynxt: "Launch from a template in minutes, then reuse it.",
+      other: "Type the same reply again for every comment.",
     },
     {
       label: "Measurement",
-      replynxt: "Use tracked links and keyword analytics per campaign.",
-      other: "Rely on screenshots, inbox memory, or scattered link data.",
+      replynxt: "Clicks and top keywords per campaign.",
+      other: "Screenshots, memory, or link data spread across tools.",
     },
     {
-      label: "Reuse",
-      replynxt: "Clone the same playbook across posts, reels, and client accounts.",
-      other: "Repeat setup work for every campaign.",
+      label: "Busy posts",
+      replynxt: "Every matching comment gets its reply, even when a reel takes off.",
+      other: "Comments get missed once they pile up.",
     },
   ],
-  templateLinks,
+  templateLinks: [template.dtc, template.fitness, template.webinar, template.restaurant, template.event, template.realEstate],
   faqs: [
     {
-      title: "Can I edit the template copy?",
-      body: "Yes. Templates are starting points. You can change keywords, private reply text, tracked destination URLs, and active status before launching.",
+      title: "Can I edit a template's copy?",
+      body: "Yes. Templates are starting points: change the keywords, the private reply, the link it sends, and whether the campaign is live.",
     },
     {
-      title: "Do templates work for reels?",
-      body: "Yes. Campaigns can target Instagram posts or reels returned by the connected professional account.",
+      title: "Do templates work on reels?",
+      body: "Yes. A campaign can target any post or reel on the connected Instagram professional account.",
+    },
+    {
+      title: "Can I use my own keywords?",
+      body: "Yes. Add as many as you like, such as PRICE or WAITLIST, or a word in any language.",
     },
   ],
 };
 
 export const agenciesSeoPage: SeoPageConfig = {
   eyebrow: "Instagram DM automation for agencies",
-  title: "Instagram DM automation for agencies managing client campaigns",
+  title: "Comment-to-DM campaigns for every client, from one workspace",
   description:
-    "ReplyNxt gives agencies multi-account workspaces, client-ready reports, tracked links, and a focused comment-to-DM workflow for repeatable Instagram campaigns.",
+    "Connect your clients' Instagram accounts, run repeatable comment campaigns for each, and send them a report link that shows the results without exposing your workspace.",
   primaryCta: "Start an agency workspace",
+  secondaryCta: { label: "See Agency pricing", href: "/#pricing" },
   bullets: [
-    "Connect multiple client Instagram accounts on the Agency plan.",
-    "Filter dashboards, logs, campaigns, and settings by account.",
-    "Invite teammates as owners, admins, or members.",
-    "Share read-only client reports without exposing workspace controls.",
+    "Up to 10 client Instagram accounts on the Agency plan",
+    "Campaigns, logs and stats filtered by account",
+    "Teammates as owners, admins or members",
+    "Read-only report links for each client",
   ],
+  sectionsTitle: "What changes when you run it for clients",
   sections: [
     {
-      title: "Client separation",
-      body: "Account filters keep campaign creation, logs, and reporting cleaner when one workspace manages multiple brands.",
+      title: "Clients stay separate",
+      body: "Filter campaigns, logs and stats by account, so ten brands in one workspace never blur together.",
     },
     {
-      title: "Repeatable offers",
-      body: "Use templates to package lead magnets, product drops, price replies, and launch waitlists as repeatable agency services.",
+      title: "Services you can repeat",
+      body: "Package lead magnets, product drops, price replies and launch waitlists as offers you run again for each client.",
     },
     {
       title: "Proof of work",
-      body: "Shareable reports show sends, skips, failures, clicks, CTR, top keywords, and tracked links in a client-safe view.",
+      body: "Report links show sends, skips, failures, clicks, click rate, top keywords and links, without your workspace controls or DM copy.",
     },
   ],
-  comparisonTitle: "Agency workflow vs generic automation",
+  comparisonTitle: "Running client campaigns: ReplyNxt next to the usual setup",
+  comparisonOther: "The usual setup",
   comparisons: [
     {
       label: "Client reporting",
-      replynxt: "Public read-only campaign report links with paid-plan unbranded reporting.",
-      other: "Manual screenshots or dashboards that expose too much internal workspace context.",
+      replynxt: "A read-only report link per campaign; unbranded on paid plans.",
+      other: "Screenshots, or dashboards that show clients too much.",
     },
     {
-      label: "Team roles",
-      replynxt: "Owner, admin, and member roles with invite links.",
-      other: "Often one shared login or overpowered teammate access.",
+      label: "Team access",
+      replynxt: "Owner, admin and member roles with invite links.",
+      other: "One shared login, or teammates with full access.",
     },
     {
-      label: "Account operations",
-      replynxt: "Per-account filters for campaigns, logs, dashboard stats, and settings.",
-      other: "Client work can get mixed across broad automation workspaces.",
+      label: "Many accounts",
+      replynxt: "Every view filters by Instagram account.",
+      other: "Client work mixed together in one place.",
     },
   ],
-  templateLinks,
+  templateLinks: [template.dtc, template.beauty, template.realEstate],
   faqs: [
     {
-      title: "How many Instagram accounts can agencies connect?",
-      body: "The Agency plan is shaped for up to 10 connected Instagram professional accounts in the current launch packaging.",
+      title: "How many Instagram accounts can an agency connect?",
+      body: "Up to 10 on the Agency plan. If you need more, the Custom plan on the pricing page is for you.",
     },
     {
       title: "Can clients see reports without logging in?",
-      body: "Yes. Shareable report pages are public read-only links that hide private workspace controls and DM copy.",
+      body: "Yes. Each report is a read-only link that hides your workspace controls and the DM copy.",
+    },
+    {
+      title: "Can my team work in the same workspace?",
+      body: "Yes. Invite teammates as admins or members; only owners manage billing.",
     },
   ],
 };
 
 export const commentLinkSeoPage: SeoPageConfig = {
   eyebrow: "Comment LINK automation",
-  title: "Comment LINK automation for Instagram posts and reels",
+  title: "Comment LINK on Instagram, get the link in a DM",
   description:
-    "Let followers comment LINK, SHOP, GUIDE, or any keyword and receive the right private reply with a tracked destination URL.",
+    "Followers comment LINK, SHOP, GUIDE or any keyword you choose, and each one gets a private reply with the right link, tracked so you can see who clicked.",
   primaryCta: "Automate comment LINK",
   bullets: [
-    "Match exact keywords or whole-word phrases.",
-    "Send Meta-compliant private replies from the triggering comment.",
-    "Insert tracked links into replies with click analytics.",
-    "Deduplicate comment jobs and log sent, skipped, and failed outcomes.",
+    "Match whole words or parts of words, in any language",
+    "Official private replies to the comment that asked",
+    "Tracked links with click counts",
+    "Every comment logged as sent, skipped or failed",
   ],
+  sectionsTitle: "Where comment LINK pays off",
   sections: [
     {
-      title: "For product links",
-      body: "Turn high-intent LINK comments into tracked visits to product pages, landing pages, waitlists, or checkout offers.",
+      title: "Product links",
+      body: "Turn LINK comments into visits to product pages, landing pages, waitlists or checkout, and see how many clicked.",
     },
     {
-      title: "For creator offers",
-      body: "Send guides, free resources, course links, and coaching applications without manually watching the inbox.",
+      title: "Creator offers",
+      body: "Send guides, free resources, course links and coaching applications without watching the inbox.",
     },
     {
-      title: "For launch spikes",
-      body: "Queue and process campaign replies while a reel is getting attention, with plan and rate-limit checks in the worker.",
+      title: "Launch spikes",
+      body: "When a reel takes off, replies queue up and go out in order, within your plan's limits.",
     },
   ],
-  comparisonTitle: "Comment LINK automation vs manual link replies",
+  comparisonTitle: "Comment LINK automation next to pasting links by hand",
+  comparisonOther: "Pasting links by hand",
   comparisons: [
     {
-      label: "Reply accuracy",
-      replynxt: "Every matched comment gets the campaign reply tied to that post or reel.",
-      other: "Manual replies are easy to miss when comments spike.",
+      label: "Coverage",
+      replynxt: "Every matching comment on the post or reel gets its reply.",
+      other: "Comments get missed when they spike.",
     },
     {
       label: "Tracking",
-      replynxt: "Tracked links connect private replies to click outcomes.",
-      other: "Regular pasted links rarely show campaign-level performance.",
+      replynxt: "Clicks counted per campaign.",
+      other: "A pasted link shows nothing about who clicked.",
     },
     {
-      label: "Compliance",
-      replynxt: "Built around official private reply semantics and rate-aware queues.",
-      other: "Unsafe browser automation or scraping can put accounts at risk.",
+      label: "Account safety",
+      replynxt: "Official private replies, paced by a queue.",
+      other: "Browser automation or scraping tools can put the account at risk.",
     },
   ],
-  templateLinks,
+  templateLinks: [template.dtc, template.fitness, template.event],
   faqs: [
     {
       title: "Can I use keywords other than LINK?",
-      body: "Yes. Each campaign can use multiple keywords such as PRICE, SHOP, GUIDE, PLAN, WAITLIST, TOUR, or your own phrase.",
+      body: "Yes. Each campaign can have several, such as PRICE, SHOP, GUIDE, PLAN, WAITLIST or TOUR, or a phrase of your own.",
     },
     {
-      title: "Does ReplyNxt send a normal Instagram DM?",
-      body: "It sends a Meta-compliant private reply triggered by the comment event, using the Instagram comment ID.",
+      title: "Is this a normal Instagram DM?",
+      body: "It's a private reply: Instagram's official way to message someone who commented, linked to their comment.",
+    },
+    {
+      title: "Can a comment get two replies by mistake?",
+      body: "No. Instagram allows one private reply per comment, and ReplyNxt sends at most one, even if the same comment arrives twice or matches two campaigns. The extra attempt is logged as skipped.",
     },
   ],
 };
-

@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import PublicSiteHeader from "@/components/public-site-header";
-import TemplateVisual from "@/components/template-visual";
+import SiteShell from "@/components/site-shell";
+import CtaButton from "@/components/site/cta-button";
+import TemplateCard from "@/components/templates/template-card";
+import TemplateDeck from "@/components/templates/template-deck";
+import { SectionHeading } from "@/components/site/primitives";
+import Reveal from "@/components/site/reveal";
+import SplitHeadline from "@/components/site/split-headline";
 import { CAMPAIGN_TEMPLATES } from "@/lib/templates/campaign-templates";
 
 export const metadata: Metadata = {
@@ -16,98 +20,76 @@ export const metadata: Metadata = {
   ],
 };
 
-export default function TemplatesPage() {
-  return (
-    <main className="min-h-screen bg-background text-foreground">
-      <PublicSiteHeader active="templates" />
+// Each card's place in the bento, in library order.
+const bento: { size: "wide" | "tall" | "regular"; span: string }[] = [
+  { size: "wide", span: "md:col-span-2 lg:col-span-4" },
+  { size: "tall", span: "lg:col-span-2 lg:row-span-2" },
+  { size: "regular", span: "lg:col-span-2" },
+  { size: "regular", span: "lg:col-span-2" },
+  { size: "regular", span: "lg:col-span-2" },
+  { size: "regular", span: "lg:col-span-2" },
+  { size: "regular", span: "lg:col-span-2" },
+  { size: "wide", span: "md:col-span-2 lg:col-span-6" },
+];
 
-      <section className="border-b border-white/10 bg-zinc-950/55">
-        <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-16 sm:px-6 lg:grid-cols-[0.88fr_1.12fr] lg:px-8 lg:py-20">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-wide text-cyan-200">
-              Public template library
-            </p>
-            <h1 className="mt-4 text-5xl font-black leading-[1.02] text-white sm:text-6xl">
-              Instagram campaigns you can copy in minutes
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-300">
-              Start with proven comment-to-DM playbooks for lead magnets,
-              product links, events, service menus, and agency client campaigns.
+export default function TemplatesPage() {
+  // Three different kinds of campaign for the deck in the hero.
+  const deck = ["event-rsvp", "fitness-plan", "dtc-product-link"]
+    .map((slug) => CAMPAIGN_TEMPLATES.find((template) => template.slug === slug))
+    .filter((template) => template !== undefined);
+
+  return (
+    <SiteShell active="templates">
+      <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pb-16 pt-10 sm:px-6 sm:pt-16 lg:grid-cols-[1.1fr_0.9fr]">
+        <div>
+          <Reveal onLoadDelay={0}>
+            <p className="site-mono text-[13px] text-site-paper">Template library</p>
+          </Reveal>
+          <SplitHeadline
+            as="h1"
+            onLoad
+            className="mt-4 text-[clamp(2.75rem,5.5vw,4.75rem)] leading-[1]"
+          >
+            Instagram campaigns you can copy in minutes
+          </SplitHeadline>
+          <Reveal onLoadDelay={0.4}>
+            <p className="mt-6 max-w-xl text-lg leading-8 text-site-paper/85">
+              Ready-made comment-to-DM campaigns for lead magnets, product links, events,
+              service menus and client work, each with its keywords and reply written for you.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center bg-cyan-300 px-6 py-3 text-sm font-bold text-zinc-950 transition hover:bg-cyan-200"
-              >
+              <CtaButton href="/login" size="lg">
                 Start free
-              </Link>
-              <a
-                href="#template-grid"
-                className="inline-flex items-center justify-center border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-bold text-white transition hover:border-white/20 hover:bg-white/[0.08]"
-              >
+              </CtaButton>
+              <CtaButton href="#template-grid" size="lg" variant="secondary">
                 Browse templates
-              </a>
+              </CtaButton>
             </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {CAMPAIGN_TEMPLATES.slice(0, 2).map((template) => (
-              <TemplateVisual key={template.slug} template={template} compact />
-            ))}
-          </div>
+          </Reveal>
         </div>
+        <Reveal onLoadDelay={0.55}>
+          <TemplateDeck templates={deck} />
+        </Reveal>
       </section>
 
-      <section
-        id="template-grid"
-        className="mx-auto w-full max-w-7xl px-5 py-16 sm:px-6 lg:px-8"
-      >
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {CAMPAIGN_TEMPLATES.map((template) => (
-            <article
-              key={template.slug}
-              className="flex min-h-full flex-col border border-white/10 bg-white/[0.035] p-5 transition hover:border-white/20 hover:bg-white/[0.055]"
-            >
-              <div className="mb-5">
-                <TemplateVisual template={template} compact />
-              </div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
-                {template.category}
-              </p>
-              <h2 className="mt-3 text-xl font-black leading-tight text-white">
-                {template.title}
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-zinc-400">
-                {template.summary}
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {template.keywords.map((keyword) => (
-                  <span
-                    key={keyword}
-                    className="border border-white/10 bg-zinc-950 px-2 py-1 text-xs font-semibold text-zinc-300"
-                  >
-                    {keyword}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-auto grid gap-2 pt-6">
-                <Link
-                  href={`/templates/${template.slug}`}
-                  className="inline-flex w-full items-center justify-center border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold text-white transition hover:border-white/20 hover:bg-white/[0.08]"
-                >
-                  View playbook
-                </Link>
-                <Link
-                  href={`/login?template=${template.slug}`}
-                  className="inline-flex w-full items-center justify-center bg-cyan-300 px-4 py-3 text-sm font-bold text-zinc-950 transition hover:bg-cyan-200"
-                >
-                  Use this template
-                </Link>
-              </div>
-            </article>
-          ))}
-        </div>
+      <section id="template-grid" className="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6 sm:py-24">
+        <SectionHeading
+          label={`${CAMPAIGN_TEMPLATES.length} templates`}
+          title="Pick the one closest to your campaign"
+        />
+        {/* A bento: a wide card, a tall one beside it, compact cards between,
+            and a wide card to close. Two columns on tablets, one on phones. */}
+        <Reveal stagger as="ul" className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+          {CAMPAIGN_TEMPLATES.map((template, index) => {
+            const { size, span } = bento[index % bento.length];
+            return (
+              <li key={template.slug} className={span}>
+                <TemplateCard template={template} size={size} />
+              </li>
+            );
+          })}
+        </Reveal>
       </section>
-    </main>
+    </SiteShell>
   );
 }
