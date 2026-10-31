@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getCurrentUserId } from "@/lib/auth";
+import { EMAIL_PROVIDER_ID, getCurrentUserId, signIn } from "@/lib/auth";
+import { safeCallbackPath } from "@/lib/auth-password/callback";
 import { prisma } from "@/lib/db/client";
 import { verifyCurrentPassword } from "@/lib/auth-password/authenticate";
 import { hashPassword, passwordProblem } from "@/lib/auth-password/hash";
@@ -42,10 +43,10 @@ export async function setPassword(
     const current = String(formData.get("current") ?? "");
     const check = await verifyCurrentPassword(userId, user.passwordHash, current);
     if (check === "locked") {
-      return { error: "Too many tries. Wait 15 minutes, or sign out and use \"Forgot password?\"." };
+      return { error: "Too many tries. Wait 15 minutes, or email yourself a sign-in link below." };
     }
     if (check === "invalid") {
-      return { error: "Your current password isn't right. Forgot it? Sign out and use \"Forgot password?\"." };
+      return { error: "Your current password isn't right. Forgot it? Email yourself a sign-in link below." };
     }
   }
 
@@ -68,4 +69,22 @@ export async function setPassword(
   // Confirm in place rather than redirecting: a redirect lands somewhere that
   // says nothing about the change, after the form has already gone blank.
   return { error: null, saved: true };
+}
+
+/**
+ * For someone asked for a current password they've forgotten: emails a
+ * sign-in link to their own address. Following it starts a fresh session,
+ * which may set a new password without the old one for 15 minutes.
+ */
+export async function emailResetLink(formData: FormData): Promise<void> {
+  const userId = await getCurrentUserId();
+  if (!userId) redirect("/login?method=link&reason=forgot");
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  if (!user?.email) redirect("/login?method=link&reason=forgot");
+
+  const next = safeCallbackPath(String(formData.get("next") ?? ""));
+  await signIn(EMAIL_PROVIDER_ID, {
+    email: user.email,
+    redirectTo: `/account/password?next=${encodeURIComponent(next)}`,
+  });
 }

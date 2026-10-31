@@ -33,8 +33,8 @@ export async function signInWithPassword(
 
 /**
  * Emails a sign-in link. Following it is what verifies the address. People
- * without a password yet land on the page to set one, then carry on to where
- * they were going.
+ * without a password yet, or resetting a forgotten one, land on the page to
+ * set one, then carry on to where they were going.
  */
 export async function sendMagicLink(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim();
@@ -45,7 +45,8 @@ export async function sendMagicLink(formData: FormData): Promise<void> {
         select: { passwordHash: true },
       })
     : null;
-  const redirectTo = user?.passwordHash
+  const resetting = formData.get("reason") === "forgot";
+  const redirectTo = user?.passwordHash && !resetting
     ? callback
     : `/account/password?next=${encodeURIComponent(callback)}`;
   await signIn(EMAIL_PROVIDER_ID, { email, redirectTo });

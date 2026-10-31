@@ -186,6 +186,7 @@ export default async function LoginPage({
                     <p className="mt-2 text-[15px] leading-6 text-site-dim">{linkCopy.body}</p>
                     <form action={sendMagicLink} className="mt-7 space-y-5">
                       <input type="hidden" name="callbackUrl" value={callbackUrl} />
+                      {reason === "forgot" && <input type="hidden" name="reason" value="forgot" />}
                       <div className="space-y-2">
                         <label htmlFor="email" className="block text-[15px] font-semibold">
                           Email
