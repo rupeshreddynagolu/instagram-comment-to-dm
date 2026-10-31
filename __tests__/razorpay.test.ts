@@ -111,6 +111,14 @@ describe("Razorpay mapping", () => {
     expect(getPlanForRazorpayPlanId("plan_agency_yearly")).toBe("AGENCY");
   });
 
+  it("still recognises plans that were replaced, so existing subscribers keep access", () => {
+    vi.stubEnv("RAZORPAY_PLAN_PRO_PREVIOUS", "plan_old_pro, plan_older_pro");
+    vi.stubEnv("RAZORPAY_PLAN_AGENCY_PREVIOUS", "plan_old_agency");
+    expect(getPlanForRazorpayPlanId("plan_old_pro")).toBe("PRO");
+    expect(getPlanForRazorpayPlanId("plan_older_pro")).toBe("PRO");
+    expect(getPlanForRazorpayPlanId("plan_old_agency")).toBe("AGENCY");
+  });
+
   it("never matches an unset yearly plan against an empty plan ID", () => {
     vi.stubEnv("RAZORPAY_PLAN_PRO_YEARLY", "");
     expect(getPlanForRazorpayPlanId("")).toBe("FREE");

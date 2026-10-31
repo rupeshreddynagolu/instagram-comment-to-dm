@@ -43,12 +43,25 @@ export function razorpayPlanEnvName(plan: PaidPlan, interval: BillingInterval) {
   return `RAZORPAY_PLAN_${plan}${interval === "YEARLY" ? "_YEARLY" : ""}` as const;
 }
 
+/**
+ * Plan IDs that were replaced (renamed plans, old prices), comma-separated in
+ * RAZORPAY_PLAN_PRO_PREVIOUS / RAZORPAY_PLAN_AGENCY_PREVIOUS. Subscribers on
+ * them keep their plan; new checkouts only ever use the current IDs.
+ */
+function previousRazorpayPlanIds(plan: PaidPlan): string[] {
+  return (process.env[`RAZORPAY_PLAN_${plan}_PREVIOUS`] ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
 export function getPlanForRazorpayPlanId(planId: string | null | undefined): Plan {
   if (!planId) return "FREE";
   for (const plan of ["AGENCY", "PRO"] as const) {
     for (const interval of ["MONTHLY", "YEARLY"] as const) {
       if (planId === process.env[razorpayPlanEnvName(plan, interval)]) return plan;
     }
+    if (previousRazorpayPlanIds(plan).includes(planId)) return plan;
   }
   return "FREE";
 }
