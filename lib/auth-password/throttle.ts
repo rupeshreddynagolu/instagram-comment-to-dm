@@ -1,20 +1,36 @@
 // Fixed-window counters, kept in memory like the sign-in lockout: per
 // process, so a few workers on cPanel each keep their own count. Enough to
 // stop an inbox being flooded or an email list being run through sign-in.
-const windows = new Map<string, { count: number; since: number }>();
-// Past this many keys, ended windows are cleared before adding another.
+const windows = new Map<string, { count: number; expires: number }>();
+// Ended windows are cleared at most once a minute, and only once there are
+// many keys; past MAX_KEYS the oldest go, so memory stays bounded however
+// many keys arrive.
 const PRUNE_AT = 10_000;
+const MAX_KEYS = 50_000;
+const PRUNE_EVERY_MS = 60_000;
+let lastPrune = 0;
+
+function prune(now: number) {
+  if (windows.size >= PRUNE_AT && now - lastPrune >= PRUNE_EVERY_MS) {
+    lastPrune = now;
+    for (const [key, entry] of windows) {
+      if (entry.expires <= now) windows.delete(key);
+    }
+  }
+  // A Map iterates in insertion order, so the first keys are the oldest.
+  for (const key of windows.keys()) {
+    if (windows.size < MAX_KEYS) break;
+    windows.delete(key);
+  }
+}
 
 /** Counts one use of `key`; false once it has been used `limit` times in the window. */
 export function take(key: string, limit: number, windowMs: number, now: number = Date.now()): boolean {
-  if (windows.size >= PRUNE_AT) {
-    for (const [stored, entry] of windows) {
-      if (now - entry.since > windowMs) windows.delete(stored);
-    }
-  }
   const entry = windows.get(key);
-  if (!entry || now - entry.since > windowMs) {
-    windows.set(key, { count: 1, since: now });
+  if (!entry || entry.expires <= now) {
+    windows.delete(key);
+    prune(now);
+    windows.set(key, { count: 1, expires: now + windowMs });
     return true;
   }
   if (entry.count >= limit) return false;
@@ -24,22 +40,31 @@ export function take(key: string, limit: number, windowMs: number, now: number =
 
 export function resetThrottleForTests() {
   windows.clear();
+  lastPrune = 0;
 }
 
 export function throttleSizeForTests(): number {
   return windows.size;
 }
 
+// A plain addr-spec in ASCII: the local part's allowed characters, then
+// dot-separated domain labels that don't start or end with a hyphen. Nothing
+// a mail library could read as a display name, group, comment or second
+// address.
+const LOCAL = "[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*";
+const LABEL = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?";
+const PLAIN_EMAIL = new RegExp(`^${LOCAL}@(?:${LABEL}\\.)+[a-z]{2,63}$`);
+
 /**
  * The address a sign-in link will really go to, or null. Auth.js lowercases
- * and trims the email, and keeps only what comes before a comma in the
- * domain; accepting only plain addresses means this is exactly the address it
- * sends to, so limits keyed on it can't be dodged with variants.
+ * and trims the email before sending; accepting only plain addresses means
+ * this is exactly the address the mail goes to, so limits keyed on it can't
+ * be dodged with variants.
  */
 export function plainEmail(raw: string): string | null {
   const email = raw.trim().toLowerCase();
   if (email.length > 254) return null;
-  return /^[^\s@,"]+@[^\s@,"]+\.[^\s@,"]+$/.test(email) ? email : null;
+  return PLAIN_EMAIL.test(email) ? email : null;
 }
 
 /**

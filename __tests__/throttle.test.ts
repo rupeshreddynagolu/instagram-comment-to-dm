@@ -51,7 +51,7 @@ describe("plainEmail", () => {
   it("refuses anything Auth.js would quietly rewrite to another address", () => {
     // Auth.js keeps only what's before a comma in the domain, so these would
     // all reach riya@example.com while counting as different addresses.
-    for (const bad of ["riya@example.com,1", "riya@example.com, x", "a@b@example.com", "\"a\"@example.com", "riya", "riya@", ""]) {
+    for (const bad of ["riya@example.com>", "<riya@example.com>", "a;b@example.com", "riya@exa(mple).com", "riya@example.com\\", "ri\u0000ya@example.com", "rïya@example.com", "riya@example..com", "riya@-example.com", "riya@example.com,1", "riya@example.com, x", "a@b@example.com", "\"a\"@example.com", "riya", "riya@", ""]) {
       expect(plainEmail(bad)).toBeNull();
     }
   });
@@ -66,7 +66,20 @@ describe("take, under load", () => {
 
   it("forgets windows that have ended once there are many keys", () => {
     for (let i = 0; i < 10_001; i++) take(`old-${i}`, 1, 1_000, 0);
-    take("new", 1, 1_000, 5_000);
+    take("new", 1, 1_000, 120_000);
     expect(throttleSizeForTests()).toBe(1);
+  });
+
+  it("never holds more than its cap, dropping the oldest keys", () => {
+    for (let i = 0; i < 50_010; i++) take(`live-${i}`, 1, 3_600_000, 0);
+    expect(throttleSizeForTests()).toBeLessThanOrEqual(50_000);
+    // The newest key is still counted.
+    expect(take("live-50009", 1, 3_600_000, 1)).toBe(false);
+  });
+
+  it("accepts ordinary addresses", () => {
+    for (const ok of ["riya.k+ig@example.co.in", "o'neil@mail.example.com", "a_b-c@x-y.io"]) {
+      expect(plainEmail(ok)).toBe(ok);
+    }
   });
 });
