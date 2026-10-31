@@ -1,6 +1,5 @@
 import Link from "next/link";
 import SiteMark from "@/components/site-mark";
-import CtaButton from "@/components/site/cta-button";
 import MobileMenu from "@/components/site/mobile-menu";
 
 export type SiteSection = "home" | "templates" | "agencies";
@@ -9,12 +8,13 @@ interface PublicSiteHeaderProps {
   active?: SiteSection;
 }
 
+// The description shows only in the card menu on phones and tablets.
 const navLinks = [
-  { label: "Templates", href: "/templates", key: "templates" },
-  { label: "Product", href: "/#product", key: "product" },
-  { label: "Use cases", href: "/#use-cases", key: "use-cases" },
-  { label: "Agencies", href: "/instagram-dm-automation-agencies", key: "agencies" },
-  { label: "Pricing", href: "/#pricing", key: "pricing" },
+  { label: "Templates", href: "/templates", key: "templates", description: "Ready-made campaigns" },
+  { label: "Product", href: "/#product", key: "product", description: "How it works" },
+  { label: "Use cases", href: "/#use-cases", key: "use-cases", description: "Stores, creators, guides" },
+  { label: "Agencies", href: "/instagram-dm-automation-agencies", key: "agencies", description: "Run client campaigns" },
+  { label: "Pricing", href: "/#pricing", key: "pricing", description: "Free, Pro and Agency" },
 ];
 
 // Every item in the bar shares one face, size and height.
@@ -23,7 +23,8 @@ const item =
 
 /**
  * The site header on every public page: one floating glass bar holding the
- * mark, the sections, and the sign-in actions.
+ * mark, the sections and Sign in. Below desktop width the sections move into
+ * a card menu.
  */
 export default function PublicSiteHeader({ active }: PublicSiteHeaderProps) {
   return (
@@ -55,21 +56,15 @@ export default function PublicSiteHeader({ active }: PublicSiteHeaderProps) {
         </nav>
 
         <div className="flex items-center gap-1">
-          <Link href="/login" className={`${item} text-site-paper hover:bg-white/5 max-sm:hidden`}>
+          {/* The bar's one action. Starting free lives on the page itself. */}
+          <Link
+            href="/login"
+            className={`${item} border border-white/15 px-4 text-site-paper hover:border-white/30 hover:bg-white/5`}
+          >
             Sign in
           </Link>
-          {/* The primary action: the same button as every other "Start". */}
-          {/* Same face, size and height as the other items; only the fill
-              marks it as the main action. */}
-          <CtaButton href="/login" size="sm" chevron={false} className="site-mono px-4 font-semibold">
-            Start free
-          </CtaButton>
 
-          <MobileMenu
-            className="lg:hidden"
-            active={active}
-            links={[...navLinks, { label: "Sign in", href: "/login", key: "sign-in" }]}
-          />
+          <MobileMenu className="lg:hidden" active={active} links={navLinks} />
         </div>
       </div>
     </header>
